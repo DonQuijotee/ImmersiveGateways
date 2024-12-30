@@ -1,0 +1,28 @@
+modLoader = "javafml"
+loaderVersion = "[@LOADER_MAJOR@,)"
+issueTrackerURL = "https://github.com/Luke100000/ImmersiveGateways/issues"
+license = "GPL-3.0-only"
+
+[[mods]]
+modId = "immersive_gateways"
+version = "${version}"
+displayName = "Immersive Gateways"
+displayURL = "https://www.curseforge.com/minecraft/mc-mods/immersive-gateways"
+authors = "Luke100000"
+description = "Ancient gateways connecting the world in an immersive way, preserving exploration and encouraging traditional travel."
+logoFile = "icon.png"
+itemIcon = "minecraft:crossbow"
+
+[[dependencies.immersive_gateways]]
+modId = "minecraft"
+mandatory = true
+versionRange = "[@MINECRAFT_VERSION@,)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.immersive_gateways]]
+modId = "forge"
+mandatory = true
+versionRange = "[@LOADER_MAJOR@,)"
+ordering = "NONE"
+side = "BOTH"
