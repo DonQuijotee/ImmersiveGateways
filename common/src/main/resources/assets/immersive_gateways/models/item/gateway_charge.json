@@ -1,0 +1,14 @@
+{
+  "parent": "item/generated",
+  "textures": {
+    "layer0": "immersive_gateways:item/gateway_charge"
+  },
+  "overrides": [
+    {
+      "predicate": {
+        "immersive_gateways:linked": 1
+      },
+      "model": "immersive_gateways:item/gateway_charge_linked"
+    }
+  ]
+}

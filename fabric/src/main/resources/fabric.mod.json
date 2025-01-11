@@ -21,6 +21,9 @@
   "entrypoints": {
     "main": [
       "net.conczin.immersive_gateways.fabric.ImmersiveGatewaysFabric"
+    ],
+    "client": [
+      "net.conczin.immersive_gateways.fabric.ImmersiveGatewaysFabricClient"
     ]
   },
   "mixins": [
