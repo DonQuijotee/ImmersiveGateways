@@ -2,21 +2,19 @@ package net.conczin.immersive_gateways.block;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.mojang.math.Axis;
 import net.conczin.immersive_gateways.ImmersiveGateways;
+import net.conczin.immersive_gateways.Utils;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
 import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.level.Level;
-import org.joml.*;
 import org.joml.Math;
+import org.joml.*;
 
 public class GatewayBlockEntityRenderer<T extends GatewayBlockEntity> implements BlockEntityRenderer<T> {
-    public static final ResourceLocation RUNES_LOCATION = ImmersiveGateways.locate("textures/entity/runes.png");
+    public static final ResourceLocation BLANK_LOCATION = ImmersiveGateways.locate("textures/entity/white.png");
 
     public static final Vector3f[] NORMALS = new Vector3f[]{
             new Vector3f(0.0f, 0.0f, -1.0f),
@@ -32,66 +30,46 @@ public class GatewayBlockEntityRenderer<T extends GatewayBlockEntity> implements
     }
 
     public void render(T blockEntity, float partialTick, PoseStack poseStack, MultiBufferSource buffer, int packedLight, int packedOverlay) {
-        Direction.Axis value = blockEntity.getBlockState().getValue(GatewayBlock.AXIS);
-
-        poseStack.pushPose();
-
-        Level level = blockEntity.getLevel();
-        double time = (level == null ? 0.0 : (double) level.getGameTime() + partialTick) * 0.05;
-
-        renderRuneCube(blockEntity, time, partialTick, poseStack, buffer, packedLight, packedOverlay, 0);
-        renderRuneCube(blockEntity, time, partialTick, poseStack, buffer, packedLight, packedOverlay, 1);
-        renderRuneCube(blockEntity, time, partialTick, poseStack, buffer, packedLight, packedOverlay, 2);
-        renderRuneCube(blockEntity, time, partialTick, poseStack, buffer, packedLight, packedOverlay, 3);
-
-        poseStack.popPose();
+        renderRuneCube(blockEntity, partialTick, poseStack, buffer, packedLight, packedOverlay, 0);
+        renderRuneCube(blockEntity, partialTick, poseStack, buffer, packedLight, packedOverlay, 1);
+        renderRuneCube(blockEntity, partialTick, poseStack, buffer, packedLight, packedOverlay, 2);
+        renderRuneCube(blockEntity, partialTick, poseStack, buffer, packedLight, packedOverlay, 3);
     }
 
-    private double noise(double time) {
-        return Math.sin(time) + Math.sin(time * 1.7) * 0.5 + Math.sin(time * 2.3) * 0.25 + Math.sin(time * 3.1) * 0.125;
-    }
-
-    private void renderRuneCube(T blockEntity, double time, float partialTick, PoseStack poseStack, MultiBufferSource buffer, int packedLight, int packedOverlay, int face) {
+    private void renderRuneCube(T blockEntity, float partialTick, PoseStack poseStack, MultiBufferSource buffer, int packedLight, int packedOverlay, int face) {
         BlockPos blockPos = blockEntity.getBlockPos();
         Vector3d position = blockEntity.getPosition(blockPos, blockEntity.getBlockState(), face);
-        double seed = time + position.x() + position.y() * 1.7 + position.z() * 2.7;
 
-        double distance = blockEntity.lastDistance[face] + (blockEntity.distance[face] - blockEntity.lastDistance[face]) * partialTick;
+        float blinkDuration = 0.2f;
+        float f = blockEntity.lastTime[face] * (1.0f - partialTick) + blockEntity.time[face] * partialTick;
+        float f2 = 1.0f - Math.min(1.0f, f / (1.0f - blinkDuration));
 
-        // Jitter
-        double noise = Math.max(0.0, noise(seed * 5.0) - 0.5) * 0.5f / 16.0f * distance;
-        double vx = noise(seed * 7.0 + 1.0) * noise;
-        double vy = noise(seed * 7.0 + 2.0) * noise;
-        double vz = noise(seed * 7.0 + 3.0) * noise;
-
-        // Wave offset
-        double wave = distance * 0.5 / 16.0;
-        double jx = noise(seed + 1.0) * wave;
-        double jy = noise(seed + 2.0) * wave;
-        double jz = noise(seed + 3.0) * wave;
+        // Smooth position
+        Vector3f offset = Utils.calculateQuadraticBezier(
+                new Vector3f(0.0f, 0.0f, 0.0f),
+                blockEntity.offsets1[face],
+                blockEntity.offsets2[face],
+                f2
+        );
 
         // Rotation
-        double rotate = 0.1 * distance;
-        double rx = noise(seed * 1.7 + 1.0) * rotate;
-        double ry = noise(seed * 1.7 + 2.0) * rotate;
-        double rz = noise(seed * 1.7 + 3.0) * rotate;
+        Quaternionf rotation = new Quaternionf();
+        rotation.slerp(blockEntity.rotations[face], f2);
+
+        float size = 0.25f * Math.sqrt(f);
+        float brightness = Math.max(0.0f, 1.0f - Math.abs(1.0f - blinkDuration - f) / blinkDuration);
 
         poseStack.pushPose();
         poseStack.translate(
-                position.x - blockPos.getX() + jx + vx,
-                position.y - blockPos.getY() + jy + vy,
-                position.z - blockPos.getZ() + jz + vz
+                position.x - blockPos.getX() + offset.x,
+                position.y - blockPos.getY() + offset.y,
+                position.z - blockPos.getZ() + offset.z
         );
-        Quaternionf q = new Quaternionf(blockEntity.lastRotations[face]);
-        q.nlerp(blockEntity.rotations[face], partialTick);
-        poseStack.mulPose(q);
-        poseStack.mulPose(Axis.XP.rotation((float) rx));
-        poseStack.mulPose(Axis.YP.rotation((float) ry));
-        poseStack.mulPose(Axis.ZP.rotation((float) rz));
-        poseStack.scale(0.1875f, 0.1875f, 0.1875f);
+        poseStack.mulPose(rotation);
+        poseStack.scale(size, size, size);
 
         this.renderCube(poseStack.last(), buffer.getBuffer(RenderType.endGateway()));
-        this.renderCube(poseStack.last(), buffer.getBuffer(RenderType.entityTranslucentEmissive(RUNES_LOCATION)), packedLight, packedOverlay);
+        this.renderCube(poseStack.last(), buffer.getBuffer(RenderType.entityTranslucentEmissive(BLANK_LOCATION)), packedLight, packedOverlay, brightness);
 
         poseStack.popPose();
     }
@@ -105,13 +83,13 @@ public class GatewayBlockEntityRenderer<T extends GatewayBlockEntity> implements
         this.renderFace(pose, consumer, -1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, -1.0f, -1.0f);
     }
 
-    private void renderCube(PoseStack.Pose pose, VertexConsumer consumer, int light, int overlay) {
-        this.renderFace(pose, consumer, -1.0f, 1.0f, -1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0, light, overlay);
-        this.renderFace(pose, consumer, -1.0f, 1.0f, 1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, 1, light, overlay);
-        this.renderFace(pose, consumer, 1.0f, 1.0f, 1.0f, -1.0f, -1.0f, 1.0f, 1.0f, -1.0f, 2, light, overlay);
-        this.renderFace(pose, consumer, -1.0f, -1.0f, -1.0f, 1.0f, -1.0f, 1.0f, 1.0f, -1.0f, 3, light, overlay);
-        this.renderFace(pose, consumer, -1.0f, 1.0f, -1.0f, -1.0f, -1.0f, -1.0f, 1.0f, 1.0f, 4, light, overlay);
-        this.renderFace(pose, consumer, -1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, -1.0f, -1.0f, 5, light, overlay);
+    private void renderCube(PoseStack.Pose pose, VertexConsumer consumer, int light, int overlay, float brightness) {
+        this.renderFace(pose, consumer, -1.0f, 1.0f, -1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0, light, overlay, brightness);
+        this.renderFace(pose, consumer, -1.0f, 1.0f, 1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, 1, light, overlay, brightness);
+        this.renderFace(pose, consumer, 1.0f, 1.0f, 1.0f, -1.0f, -1.0f, 1.0f, 1.0f, -1.0f, 2, light, overlay, brightness);
+        this.renderFace(pose, consumer, -1.0f, -1.0f, -1.0f, 1.0f, -1.0f, 1.0f, 1.0f, -1.0f, 3, light, overlay, brightness);
+        this.renderFace(pose, consumer, -1.0f, 1.0f, -1.0f, -1.0f, -1.0f, -1.0f, 1.0f, 1.0f, 4, light, overlay, brightness);
+        this.renderFace(pose, consumer, -1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, -1.0f, -1.0f, 5, light, overlay, brightness);
     }
 
     private void renderFace(PoseStack.Pose pose, VertexConsumer consumer, float x0, float x1, float y0, float y1, float z0, float z1, float z2, float z3) {
@@ -121,11 +99,11 @@ public class GatewayBlockEntityRenderer<T extends GatewayBlockEntity> implements
         consumer.vertex(pose.pose(), x0, y1, z3).endVertex();
     }
 
-    private void renderFace(PoseStack.Pose pose, VertexConsumer consumer, float x0, float x1, float y0, float y1, float z0, float z1, float z2, float z3, int face, int light, int overlay) {
-        float r = 1.0f;
+    private void renderFace(PoseStack.Pose pose, VertexConsumer consumer, float x0, float x1, float y0, float y1, float z0, float z1, float z2, float z3, int face, int light, int overlay, float brightness) {
+        float r = 0.0f;
         float g = 1.0f;
-        float b = 1.0f;
-        float a = 1.0f;
+        float b = 0.0f;
+        float a = 0.15f + 0.25f * brightness;
 
         float u = Math.floor(face / 2.0f) * 6.0f;
         float v = (face % 2.0f) * 6.0f;
