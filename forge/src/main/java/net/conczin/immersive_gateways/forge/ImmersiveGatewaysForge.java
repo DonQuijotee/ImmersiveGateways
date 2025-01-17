@@ -21,6 +21,7 @@ public class ImmersiveGatewaysForge {
         Items.bootstrap();
         Blocks.bootstrap();
         BlockEntityTypes.bootstrap();
+        Sounds.bootstrap();
 
         DEF_REG.register(FMLJavaModLoadingContext.get().getModEventBus());
     }

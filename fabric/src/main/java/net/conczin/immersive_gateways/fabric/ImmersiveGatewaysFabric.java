@@ -19,6 +19,7 @@ public class ImmersiveGatewaysFabric implements ModInitializer {
         Items.bootstrap();
         Blocks.bootstrap();
         BlockEntityTypes.bootstrap();
+        Sounds.bootstrap();
 
         CreativeModeTab group = FabricItemGroup.builder()
                 .title(ItemGroups.getDisplayName())

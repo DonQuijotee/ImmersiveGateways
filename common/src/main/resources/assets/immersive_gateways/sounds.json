@@ -1,0 +1,26 @@
+{
+  "assemble": {
+    "sounds": [
+      {
+        "name": "immersive_gateways:assemble",
+        "attenuation_distance": 32
+      }
+    ]
+  },
+  "disassemble": {
+    "sounds": [
+      {
+        "name": "immersive_gateways:disassemble",
+        "attenuation_distance": 32
+      }
+    ]
+  },
+  "gateway": {
+    "sounds": [
+      {
+        "name": "immersive_gateways:gateway",
+        "attenuation_distance": 64
+      }
+    ]
+  }
+}

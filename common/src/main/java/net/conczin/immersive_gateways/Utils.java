@@ -14,7 +14,7 @@ import org.joml.Vector3f;
 import java.util.Optional;
 
 public class Utils {
-    static Optional<BlockPos> getClosestStructurePosition(ServerLevel world, BlockPos center, ResourceLocation structure, int radius) {
+    public static Optional<BlockPos> getClosestStructurePosition(ServerLevel world, BlockPos center, ResourceLocation structure, int radius) {
         Registry<Structure> registry = world.registryAccess().registryOrThrow(Registries.STRUCTURE);
         Structure feature = registry.get(structure);
         Optional<Holder.Reference<Structure>> entry = registry.getHolder(registry.getId(feature));

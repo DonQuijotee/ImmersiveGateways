@@ -1,9 +1,16 @@
 package net.conczin.immersive_gateways.block;
 
 import net.conczin.immersive_gateways.BlockEntityTypes;
+import net.conczin.immersive_gateways.Sounds;
+import net.conczin.immersive_gateways.data.PortalDataManager;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.IntTag;
+import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntitySelector;
 import net.minecraft.world.entity.player.Player;
@@ -45,6 +52,8 @@ public class GatewayBlockEntity extends BlockEntity {
     boolean[] state = new boolean[]{false, false, false, false};
 
     Random random = new Random();
+
+    int color = 0;
 
     // The last tick a player was close to the gateway
     static final Map<UUID, Long> lastCloseTick = new ConcurrentHashMap<>();
@@ -142,13 +151,33 @@ public class GatewayBlockEntity extends BlockEntity {
             } else {
                 blockEntity.time[i] = Math.max(0.0f, blockEntity.time[i] - 1.0f / COOLDOWN);
             }
+
+            // Sound
+            float threshold = 0.75f;
+            if (blockEntity.time[i] > threshold && blockEntity.lastTime[i] <= threshold) {
+                playSound(level, pos, Sounds.ASSEMBLE.get());
+            } else if (blockEntity.time[i] <= threshold && blockEntity.lastTime[i] > threshold) {
+                playSound(level, pos, Sounds.DISASSEMBLE.get());
+            }
         }
+    }
+
+    private static void playSound(Level level, BlockPos pos, SoundEvent sound) {
+        float volume = level.random.nextFloat() * 0.1f + 0.1f;
+        float pitch = level.random.nextFloat() * 0.4f + 0.8f;
+        level.playLocalSound(pos.getX(), pos.getY(), pos.getZ(), sound, SoundSource.BLOCKS, volume, pitch, false);
     }
 
     public static void serverTick(ServerLevel level, BlockPos pos, BlockState state, GatewayBlockEntity blockEntity) {
         List<Entity> list = level.getEntitiesOfClass(Entity.class, new AABB(pos), GatewayBlockEntity::canEntityTeleport);
         if (!list.isEmpty()) {
-            teleportEntity(level, pos, state, list.get(level.random.nextInt(list.size())), blockEntity);
+            //teleportEntity(level, pos, list.get(level.random.nextInt(list.size())));
+        } // TODO: Move this into block collision, there is no reason to be slow
+
+        if (blockEntity.color == 0) {
+            PortalDataManager.PortalData search = PortalDataManager.search(level, pos);
+            blockEntity.color = 0x00FF00;
+            blockEntity.setChanged();
         }
     }
 
@@ -156,7 +185,38 @@ public class GatewayBlockEntity extends BlockEntity {
         return EntitySelector.NO_SPECTATORS.test(entity) && !entity.getRootVehicle().isOnPortalCooldown();
     }
 
-    public static void teleportEntity(Level level, BlockPos pos, BlockState state, Entity entity, GatewayBlockEntity blockEntity) {
-        // TODO: Maybe moving that to the block collision makes more sense?
+    public static void teleportEntity(ServerLevel level, BlockPos pos, Entity entity) {
+        // level.playSound(null, pos, Sounds.GATEWAY.get(), SoundSource.BLOCKS, 1.0f, 1.0f);
+        entity.playSound(Sounds.GATEWAY.get(), 1.0f, 1.0f);
+
+        entity.setPortalCooldown();
+
+        PortalDataManager.PortalData search = PortalDataManager.search(level, pos);
+
+        entity.teleportToWithTicket(search.x(), search.y(), search.z());
+        // entity.setXRot(entity.getXRot());
+        entity.setDeltaMovement(0.0, 0.0, 0.0);
+    }
+
+    @Override
+    protected void saveAdditional(CompoundTag tag) {
+        super.saveAdditional(tag);
+        tag.put("Color", IntTag.valueOf(color));
+    }
+
+    @Override
+    public void load(CompoundTag tag) {
+        super.load(tag);
+        color = tag.getInt("Color");
+    }
+
+    @Override
+    public ClientboundBlockEntityDataPacket getUpdatePacket() {
+        return ClientboundBlockEntityDataPacket.create(this);
+    }
+
+    @Override
+    public CompoundTag getUpdateTag() {
+        return this.saveWithoutMetadata();
     }
 }
