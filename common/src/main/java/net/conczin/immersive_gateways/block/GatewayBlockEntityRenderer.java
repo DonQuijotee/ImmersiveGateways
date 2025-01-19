@@ -10,6 +10,7 @@ import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
 import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.FastColor;
 import org.joml.Math;
 import org.joml.*;
 
@@ -44,6 +45,10 @@ public class GatewayBlockEntityRenderer<T extends GatewayBlockEntity> implements
         float f = blockEntity.lastTime[face] * (1.0f - partialTick) + blockEntity.time[face] * partialTick;
         float f2 = 1.0f - Math.min(1.0f, f / (1.0f - blinkDuration));
 
+        if (f <= 0.0) {
+            return;
+        }
+
         // Smooth position
         Vector3f offset = Utils.calculateQuadraticBezier(
                 new Vector3f(0.0f, 0.0f, 0.0f),
@@ -69,7 +74,7 @@ public class GatewayBlockEntityRenderer<T extends GatewayBlockEntity> implements
         poseStack.scale(size, size, size);
 
         this.renderCube(poseStack.last(), buffer.getBuffer(RenderType.endGateway()));
-        this.renderCube(poseStack.last(), buffer.getBuffer(RenderType.entityTranslucentEmissive(BLANK_LOCATION)), packedLight, packedOverlay, brightness);
+        this.renderCube(poseStack.last(), buffer.getBuffer(RenderType.entityTranslucentEmissive(BLANK_LOCATION)), packedLight, packedOverlay, brightness, blockEntity.getColor());
 
         poseStack.popPose();
     }
@@ -83,13 +88,13 @@ public class GatewayBlockEntityRenderer<T extends GatewayBlockEntity> implements
         this.renderFace(pose, consumer, -1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, -1.0f, -1.0f);
     }
 
-    private void renderCube(PoseStack.Pose pose, VertexConsumer consumer, int light, int overlay, float brightness) {
-        this.renderFace(pose, consumer, -1.0f, 1.0f, -1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0, light, overlay, brightness);
-        this.renderFace(pose, consumer, -1.0f, 1.0f, 1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, 1, light, overlay, brightness);
-        this.renderFace(pose, consumer, 1.0f, 1.0f, 1.0f, -1.0f, -1.0f, 1.0f, 1.0f, -1.0f, 2, light, overlay, brightness);
-        this.renderFace(pose, consumer, -1.0f, -1.0f, -1.0f, 1.0f, -1.0f, 1.0f, 1.0f, -1.0f, 3, light, overlay, brightness);
-        this.renderFace(pose, consumer, -1.0f, 1.0f, -1.0f, -1.0f, -1.0f, -1.0f, 1.0f, 1.0f, 4, light, overlay, brightness);
-        this.renderFace(pose, consumer, -1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, -1.0f, -1.0f, 5, light, overlay, brightness);
+    private void renderCube(PoseStack.Pose pose, VertexConsumer consumer, int light, int overlay, float brightness, int color) {
+        this.renderFace(pose, consumer, -1.0f, 1.0f, -1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0, light, overlay, brightness, color);
+        this.renderFace(pose, consumer, -1.0f, 1.0f, 1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, 1, light, overlay, brightness, color);
+        this.renderFace(pose, consumer, 1.0f, 1.0f, 1.0f, -1.0f, -1.0f, 1.0f, 1.0f, -1.0f, 2, light, overlay, brightness, color);
+        this.renderFace(pose, consumer, -1.0f, -1.0f, -1.0f, 1.0f, -1.0f, 1.0f, 1.0f, -1.0f, 3, light, overlay, brightness, color);
+        this.renderFace(pose, consumer, -1.0f, 1.0f, -1.0f, -1.0f, -1.0f, -1.0f, 1.0f, 1.0f, 4, light, overlay, brightness, color);
+        this.renderFace(pose, consumer, -1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, -1.0f, -1.0f, 5, light, overlay, brightness, color);
     }
 
     private void renderFace(PoseStack.Pose pose, VertexConsumer consumer, float x0, float x1, float y0, float y1, float z0, float z1, float z2, float z3) {
@@ -99,10 +104,10 @@ public class GatewayBlockEntityRenderer<T extends GatewayBlockEntity> implements
         consumer.vertex(pose.pose(), x0, y1, z3).endVertex();
     }
 
-    private void renderFace(PoseStack.Pose pose, VertexConsumer consumer, float x0, float x1, float y0, float y1, float z0, float z1, float z2, float z3, int face, int light, int overlay, float brightness) {
-        float r = 0.0f;
-        float g = 1.0f;
-        float b = 0.0f;
+    private void renderFace(PoseStack.Pose pose, VertexConsumer consumer, float x0, float x1, float y0, float y1, float z0, float z1, float z2, float z3, int face, int light, int overlay, float brightness, int color) {
+        float r = FastColor.ARGB32.red(color) / 255.0f;
+        float g = FastColor.ARGB32.green(color) / 255.0f;
+        float b = FastColor.ARGB32.blue(color) / 255.0f;
         float a = 0.15f + 0.25f * brightness;
 
         float u = Math.floor(face / 2.0f) * 6.0f;

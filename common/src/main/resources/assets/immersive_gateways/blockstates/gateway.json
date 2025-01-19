@@ -1,7 +1,13 @@
 {
   "variants": {
-    "axis=x": {},
-    "axis=y": {},
-    "axis=z": {}
+    "axis=x": {
+      "model": "immersive_gateways:block/gateway"
+    },
+    "axis=y": {
+      "model": "immersive_gateways:block/gateway"
+    },
+    "axis=z": {
+      "model": "immersive_gateways:block/gateway"
+    }
   }
 }

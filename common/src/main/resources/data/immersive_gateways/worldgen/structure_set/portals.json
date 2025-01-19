@@ -3,9 +3,7 @@
     "type": "minecraft:random_spread",
     "exclusion_zone": {
       "chunk_count": 1,
-      "other_set": [
-        "example:portals"
-      ]
+      "other_set": []
     },
     "spacing": 32,
     "separation": 8,

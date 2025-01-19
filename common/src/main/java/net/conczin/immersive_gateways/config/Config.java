@@ -22,6 +22,8 @@ public final class Config extends JsonConfig {
 
     public int minDistance = 512;
     public int maxDistance = 16384;
+    public int maxScanDistanceInChunks = 256;
+    public int maxScanningTimePerTickInMS = 2;
 
     public Map<String, Integer> colors = Map.of(
             "immersive_gateways:has_structure/test", 0x00FF00

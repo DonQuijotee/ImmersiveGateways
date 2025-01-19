@@ -1,18 +1,19 @@
 package net.conczin.immersive_gateways.data;
 
+import net.conczin.immersive_gateways.ImmersiveGateways;
 import net.conczin.immersive_gateways.Utils;
 import net.conczin.immersive_gateways.config.Config;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.tags.TagKey;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.saveddata.SavedData;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.stream.Stream;
 
 public class PortalDataManager {
     // The search range, or maximum portal size, in chunks
@@ -26,40 +27,80 @@ public class PortalDataManager {
         return level.getDataStorage().computeIfAbsent(PortalDataLookup::load, PortalDataLookup::new, "immersive_gateways");
     }
 
-    public static PortalData search(ServerLevel level, BlockPos pos) {
+    public static PortalData search(ServerLevel level, BlockPos pos, boolean lazy) {
         PortalDataLookup state = getState(level);
 
         // Check if a known portal is nearby
         PortalData portal = state.search(pos);
 
-        // If not portal is found, search for a connection
+        // Create a new portal if none is found
         if (portal == null) {
-            ResourceLocation structure = new ResourceLocation("minecraft:desert_pyramid");
+            // Pick random position
+            Config c = Config.getInstance();
+            float distance = level.random.nextFloat() * (c.maxDistance - c.minDistance) + c.minDistance;
+            double angle = level.random.nextFloat() * Math.PI;
+            BlockPos target = new BlockPos((int) (pos.getX() + Math.cos(angle) * distance), pos.getY(), (int) (pos.getZ() + Math.sin(angle) * distance));
 
-            // TODO: Replace with spiral and accessor into getStructureAt, filter chunks before searching
-            // Sample at random positions in the world
-            BlockPos position = null;
-            for (int attempt = 0; attempt < 32; attempt++) {
-                float distanceFactor = 1.0f + attempt / 10.0f;
-                float distance = level.random.nextFloat() * (Config.getInstance().maxDistance - Config.getInstance().minDistance) * distanceFactor + Config.getInstance().minDistance;
-                double angle = level.random.nextFloat() * Math.PI;
-                BlockPos target = new BlockPos((int) (pos.getX() + Math.cos(angle) * distance), pos.getY(), (int) (pos.getZ() + Math.sin(angle) * distance));
-                position = Utils.getClosestStructurePosition(level, target, structure, 24).orElse(target);
-
-                // If this portal is unknown, pick it
-                if (state.search(pos) == null) break;
-            }
-
-            // TODO: This here also only works if we get the structure
-            Biome biome = level.getBiome(position).value();
-
-            portal = new PortalData(position.getX(), position.getY(), position.getZ());
+            // Add portal and initialize search
+            portal = new PortalData(target);
+            state.add(pos, portal);
+            System.out.println("Blank portal created!");
         }
 
-        // Also mark
-        state.add(pos, portal);
+        // Create iterator
+        if (!portal.isResolved() && portal.iterator == null) {
+            BlockPos target = new BlockPos(portal.x, portal.y, portal.z);
+            Config c = Config.getInstance();
+            portal.iterator = Utils.getStructureSet(level, ImmersiveGateways.locate("portals"))
+                    .map(s -> new Utils.NearestMapStructureIterator(level, s, target, 0, c.maxScanDistanceInChunks, false)).orElse(null);
+            System.out.println("Iterator created!");
+
+            if (portal.iterator == null) {
+                System.out.println("Iterator not created, giving up...");
+                portal.setResolved();
+            }
+        }
+
+        // If the portal is not yet found, continue search
+        if (portal.iterator != null) {
+            while (portal.iterator.hasNext()) {
+                Utils.SearchResult result = portal.iterator.next(lazy ? Config.getInstance().maxScanningTimePerTickInMS : 0);
+                if (result.structure() != null) {
+                    if (state.search(result.pos()) != null) {
+                        System.out.println("Portal already connected, skipping...");
+                        continue;
+                    }
+
+                    // Portal found, update its final color and position
+                    System.out.println("Portal found!");
+                    portal.setColor(getColor(level, result.pos()));
+                    portal.setPosition(result.pos());
+                    portal.setResolved();
+                    state.setDirty();
+
+                    // Also add the other side
+                    state.add(result.pos(), new PortalData(pos.getX(), pos.getY(), pos.getZ(), getColor(level, pos), true));
+                    break;
+                } else if (lazy) {
+                    // Time constraint reached, wait until the next tick
+                    break;
+                }
+            }
+
+            // No portals found, give up
+            if (portal.iterator != null && !portal.iterator.hasNext()) {
+                System.out.println("Portal not found, giving up...");
+                portal.setResolved();
+            }
+        }
 
         return portal;
+    }
+
+    private static int getColor(ServerLevel level, BlockPos pos) {
+        Holder<Biome> biome = level.getBiome(pos);
+        ResourceLocation resourceLocation = biome.unwrapKey().map(ResourceKey::location).orElse(new ResourceLocation("minecraft:plains"));
+        return Config.getInstance().colors.getOrDefault(resourceLocation.toString(), 0x00FF00);
     }
 
     public static class PortalDataLookup extends SavedData {
@@ -108,12 +149,34 @@ public class PortalDataManager {
         }
     }
 
-    public record PortalData(int x, int y, int z) {
+    public static final class PortalData {
+        private int x;
+        private int y;
+        private int z;
+
+        private int color;
+        private boolean resolved;
+        private Utils.NearestMapStructureIterator iterator;
+
+        public PortalData(int x, int y, int z, int color, boolean resolved) {
+            this.x = x;
+            this.y = y;
+            this.z = z;
+            this.color = color;
+            this.resolved = resolved;
+        }
+
+        public PortalData(BlockPos target) {
+            this(target.getX(), target.getY(), target.getZ(), 0, false);
+        }
+
         public static PortalData load(CompoundTag nbt) {
             return new PortalData(
                     nbt.getInt("x"),
                     nbt.getInt("y"),
-                    nbt.getInt("z")
+                    nbt.getInt("z"),
+                    nbt.getInt("color"),
+                    nbt.getBoolean("resolved")
             );
         }
 
@@ -122,7 +185,48 @@ public class PortalDataManager {
             c.putInt("x", x);
             c.putInt("y", y);
             c.putInt("z", z);
+            c.putInt("color", color);
+            c.putBoolean("resolved", resolved);
             return c;
+        }
+
+        public int x() {
+            return x;
+        }
+
+        public int y() {
+            return y;
+        }
+
+        public int z() {
+            return z;
+        }
+
+        public int color() {
+            return color;
+        }
+
+        public void setColor(int color) {
+            this.color = color;
+        }
+
+        public void setIterator(Utils.NearestMapStructureIterator iterator) {
+            this.iterator = iterator;
+        }
+
+        public void setResolved() {
+            this.resolved = true;
+            setIterator(null);
+        }
+
+        public boolean isResolved() {
+            return resolved;
+        }
+
+        public void setPosition(BlockPos pos) {
+            this.x = pos.getX();
+            this.y = pos.getY();
+            this.z = pos.getZ();
         }
     }
 }

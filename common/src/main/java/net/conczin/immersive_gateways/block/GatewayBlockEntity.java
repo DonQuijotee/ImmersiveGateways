@@ -3,6 +3,7 @@ package net.conczin.immersive_gateways.block;
 import net.conczin.immersive_gateways.BlockEntityTypes;
 import net.conczin.immersive_gateways.Sounds;
 import net.conczin.immersive_gateways.data.PortalDataManager;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
@@ -12,19 +13,16 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntitySelector;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.AABB;
 import org.jetbrains.annotations.NotNull;
 import org.joml.Quaternionf;
 import org.joml.Vector2f;
 import org.joml.Vector3d;
 import org.joml.Vector3f;
 
-import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
@@ -47,8 +45,8 @@ public class GatewayBlockEntity extends BlockEntity {
 
     Quaternionf[] rotations;
 
-    float[] lastTime = new float[]{1.0f, 1.0f, 1.0f, 1.0f};
-    float[] time = new float[]{1.0f, 1.0f, 1.0f, 1.0f};
+    float[] lastTime = new float[]{0.0f, 0.0f, 0.0f, 0.0f};
+    float[] time = new float[]{0.0f, 0.0f, 0.0f, 0.0f};
     boolean[] state = new boolean[]{false, false, false, false};
 
     Random random = new Random();
@@ -162,27 +160,21 @@ public class GatewayBlockEntity extends BlockEntity {
         }
     }
 
+    public static void serverTick(ServerLevel level, BlockPos pos, BlockState state, GatewayBlockEntity blockEntity) {
+        // If the color is not set yet, lazily search for the second portal
+        if (blockEntity.color == 0) {
+            PortalDataManager.PortalData search = PortalDataManager.search(level, pos, true);
+            if (search.isResolved()) {
+                blockEntity.color = search.color();
+                blockEntity.setChanged();
+            }
+        }
+    }
+
     private static void playSound(Level level, BlockPos pos, SoundEvent sound) {
         float volume = level.random.nextFloat() * 0.1f + 0.1f;
         float pitch = level.random.nextFloat() * 0.4f + 0.8f;
         level.playLocalSound(pos.getX(), pos.getY(), pos.getZ(), sound, SoundSource.BLOCKS, volume, pitch, false);
-    }
-
-    public static void serverTick(ServerLevel level, BlockPos pos, BlockState state, GatewayBlockEntity blockEntity) {
-        List<Entity> list = level.getEntitiesOfClass(Entity.class, new AABB(pos), GatewayBlockEntity::canEntityTeleport);
-        if (!list.isEmpty()) {
-            //teleportEntity(level, pos, list.get(level.random.nextInt(list.size())));
-        } // TODO: Move this into block collision, there is no reason to be slow
-
-        if (blockEntity.color == 0) {
-            PortalDataManager.PortalData search = PortalDataManager.search(level, pos);
-            blockEntity.color = 0x00FF00;
-            blockEntity.setChanged();
-        }
-    }
-
-    public static boolean canEntityTeleport(Entity entity) {
-        return EntitySelector.NO_SPECTATORS.test(entity) && !entity.getRootVehicle().isOnPortalCooldown();
     }
 
     public static void teleportEntity(ServerLevel level, BlockPos pos, Entity entity) {
@@ -191,7 +183,7 @@ public class GatewayBlockEntity extends BlockEntity {
 
         entity.setPortalCooldown();
 
-        PortalDataManager.PortalData search = PortalDataManager.search(level, pos);
+        PortalDataManager.PortalData search = PortalDataManager.search(level, pos, false);
 
         entity.teleportToWithTicket(search.x(), search.y(), search.z());
         // entity.setXRot(entity.getXRot());
@@ -207,7 +199,9 @@ public class GatewayBlockEntity extends BlockEntity {
     @Override
     public void load(CompoundTag tag) {
         super.load(tag);
-        color = tag.getInt("Color");
+        if (this.level instanceof ClientLevel) {
+            color = tag.getInt("Color");
+        }
     }
 
     @Override
@@ -218,5 +212,9 @@ public class GatewayBlockEntity extends BlockEntity {
     @Override
     public CompoundTag getUpdateTag() {
         return this.saveWithoutMetadata();
+    }
+
+    public int getColor() {
+        return color;
     }
 }

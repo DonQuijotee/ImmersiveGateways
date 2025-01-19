@@ -5,10 +5,9 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.sounds.SoundEvents;
-import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntitySelector;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.BaseEntityBlock;
@@ -64,14 +63,17 @@ public class GatewayBlock extends BaseEntityBlock {
 
     @Override
     public void entityInside(BlockState state, Level level, BlockPos pos, Entity entity) {
-        System.out.println("Entity inside gateway");
+        if (level instanceof ServerLevel serverLevel && canEntityTeleport(entity)) {
+            GatewayBlockEntity.teleportEntity(serverLevel, pos, entity);
+        }
+    }
+
+    public static boolean canEntityTeleport(Entity entity) {
+        return EntitySelector.NO_SPECTATORS.test(entity) && !entity.getRootVehicle().isOnPortalCooldown();
     }
 
     @Override
     public void animateTick(BlockState state, Level level, BlockPos pos, RandomSource random) {
-        if (random.nextInt(100) == 0) {
-            // level.playLocalSound((double) pos.getX() + 0.5, (double) pos.getY() + 0.5, (double) pos.getZ() + 0.5, SoundEvents.PORTAL_AMBIENT, SoundSource.BLOCKS, 0.5f, random.nextFloat() * 0.4f + 0.8f, false);
-        }
         for (int i = 0; i < 3; ++i) {
             double x = (double) pos.getX() + random.nextDouble();
             double y = (double) pos.getY() + random.nextDouble();
