@@ -11,7 +11,7 @@ displayURL = "https://www.curseforge.com/minecraft/mc-mods/immersive-gateways"
 authors = "Luke100000"
 description = "Ancient gateways connecting the world in an immersive way, preserving exploration and encouraging traditional travel."
 logoFile = "icon.png"
-itemIcon = "minecraft:crossbow"
+itemIcon = "immersive_gateways:gateway"
 
 [[dependencies.immersive_gateways]]
 modId = "minecraft"

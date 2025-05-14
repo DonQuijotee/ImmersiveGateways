@@ -5,8 +5,8 @@
       "chunk_count": 1,
       "other_set": []
     },
-    "spacing": 32,
-    "separation": 8,
+    "spacing": 7,
+    "separation": 2,
     "salt": 74858347
   },
   "structures": [

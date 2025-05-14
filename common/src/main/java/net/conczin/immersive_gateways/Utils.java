@@ -82,8 +82,8 @@ public class Utils {
 
                 // Search for structure
                 scannedChunks++;
-                if (scannedChunks % 100 == 0) {
-                    System.out.println("Scanned " + scannedChunks + " chunks");
+                if (scannedChunks % 1000 == 0) {
+                    ImmersiveGateways.LOGGER.info("Scanned {} chunks", scannedChunks);
                 }
                 ChunkPos position = chunkPosIterator.next();
                 StructureManager structureManager = level.structureManager();

@@ -16,7 +16,10 @@ public interface BlockEntityTypes {
 
     static <T extends BlockEntity> Supplier<BlockEntityType<T>> register(String name, Supplier<BlockEntityType.Builder<T>> type) {
         Type<?> datafixerType = Util.fetchChoiceType(References.BLOCK_ENTITY, name);
-        return Registration.register(BuiltInRegistries.BLOCK_ENTITY_TYPE, ImmersiveGateways.locate(name), () -> type.get().build(datafixerType));
+        return Registration.register(BuiltInRegistries.BLOCK_ENTITY_TYPE, ImmersiveGateways.locate(name), () -> {
+            assert datafixerType != null;
+            return type.get().build(datafixerType);
+        });
     }
 
     static void bootstrap() {

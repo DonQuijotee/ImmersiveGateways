@@ -12,7 +12,10 @@ import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -165,10 +168,15 @@ public class GatewayBlockEntity extends BlockEntity {
         if (blockEntity.color == 0) {
             PortalDataManager.PortalData search = PortalDataManager.search(level, pos, true);
             if (search.isResolved()) {
-                blockEntity.color = search.color();
-                blockEntity.setChanged();
+                blockEntity.setColor(search.color());
+                level.getChunkSource().blockChanged(pos);
             }
         }
+    }
+
+    public void setColor(int color) {
+        this.color = color;
+        this.setChanged();
     }
 
     private static void playSound(Level level, BlockPos pos, SoundEvent sound) {
@@ -178,7 +186,6 @@ public class GatewayBlockEntity extends BlockEntity {
     }
 
     public static void teleportEntity(ServerLevel level, BlockPos pos, Entity entity) {
-        // level.playSound(null, pos, Sounds.GATEWAY.get(), SoundSource.BLOCKS, 1.0f, 1.0f);
         entity.playSound(Sounds.GATEWAY.get(), 1.0f, 1.0f);
 
         entity.setPortalCooldown();
@@ -186,14 +193,12 @@ public class GatewayBlockEntity extends BlockEntity {
         PortalDataManager.PortalData search = PortalDataManager.search(level, pos, false);
 
         entity.teleportToWithTicket(search.x(), search.y(), search.z());
-        // entity.setXRot(entity.getXRot());
+        entity.setYRot(search.direction().toYRot());
         entity.setDeltaMovement(0.0, 0.0, 0.0);
-    }
 
-    @Override
-    protected void saveAdditional(CompoundTag tag) {
-        super.saveAdditional(tag);
-        tag.put("Color", IntTag.valueOf(color));
+        if (entity instanceof LivingEntity livingEntity) {
+            livingEntity.addEffect(new MobEffectInstance(MobEffects.BLINDNESS, 50, 0));
+        }
     }
 
     @Override
@@ -211,7 +216,9 @@ public class GatewayBlockEntity extends BlockEntity {
 
     @Override
     public CompoundTag getUpdateTag() {
-        return this.saveWithoutMetadata();
+        CompoundTag tag = new CompoundTag();
+        tag.put("Color", IntTag.valueOf(color));
+        return tag;
     }
 
     public int getColor() {
