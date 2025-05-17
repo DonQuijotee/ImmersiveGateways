@@ -28,15 +28,47 @@ public class Utils {
         return registry.getTag(TagKey.create(Registries.STRUCTURE, structures));
     }
 
+    public static class TimeBudget {
+        private final long budget;
+        private long currentBudget;
+        private long lastTick;
+        private double totalTime;
+        private long totalCount;
+
+        public TimeBudget(long budget) {
+            this.budget = budget;
+            this.currentBudget = budget;
+        }
+
+        public boolean isTimeLeft(ServerLevel level) {
+            long time = level.getGameTime();
+            if (time != lastTick) {
+                lastTick = time;
+                currentBudget = budget;
+            }
+            return currentBudget > 0;
+        }
+
+        public void consume(long time) {
+            currentBudget -= time;
+            totalTime += time;
+            totalCount++;
+
+            if (totalCount % 1000 == 0) {
+                ImmersiveGateways.LOGGER.info("Scanned {} chunks, with {} ms per chunk.", totalCount, getAverageTime());
+            }
+        }
+
+        public double getAverageTime() {
+            return totalCount > 0 ? totalTime / totalCount / 1_000_000.0 : 0;
+        }
+    }
+
     public static class NearestMapStructureIterator {
         private final ServerLevel level;
         private final boolean skipKnownStructures;
         private final Map<RandomSpreadStructurePlacement, Set<Holder<Structure>>> placements;
         private final Iterator<ChunkPos> chunkPosIterator;
-
-        private long lastTick;
-        private long lastTime;
-        private int scannedChunks;
 
         public NearestMapStructureIterator(ServerLevel level, HolderSet<Structure> structure, BlockPos pos, int minSize, int maxSize, boolean skipKnownStructures) {
             this.level = level;
@@ -67,32 +99,24 @@ public class Utils {
             return chunkPosIterator.hasNext();
         }
 
-        public SearchResult next(int timeout) {
+        public SearchResult next(TimeBudget budget) {
             while (hasNext()) {
                 // Timeout
-                if (timeout > 0) {
-                    long time = System.nanoTime();
-                    if (level.getGameTime() != lastTick) {
-                        lastTick = level.getGameTime();
-                        lastTime = time;
-                    } else if (time - lastTime > timeout * 1_000_000L) {
-                        return new SearchResult(null, null);
-                    }
+                if (budget != null && !budget.isTimeLeft(level)) {
+                    return new SearchResult(null, null);
                 }
 
-                // Search for structure
-                scannedChunks++;
-                if (scannedChunks % 1000 == 0) {
-                    ImmersiveGateways.LOGGER.info("Scanned {} chunks", scannedChunks);
-                }
+                long time = System.nanoTime();
                 ChunkPos position = chunkPosIterator.next();
                 StructureManager structureManager = level.structureManager();
                 for (Map.Entry<RandomSpreadStructurePlacement, Set<Holder<Structure>>> entry : placements.entrySet()) {
                     Pair<BlockPos, Holder<Structure>> pair = ChunkGeneratorInvoker.invokeGetStructureGeneratingAt(entry.getValue(), level, structureManager, skipKnownStructures, entry.getKey(), position);
                     if (pair != null) {
+                        if (budget != null) budget.consume(System.nanoTime() - time);
                         return new SearchResult(pair.getFirst(), pair.getSecond());
                     }
                 }
+                if (budget != null) budget.consume(System.nanoTime() - time);
             }
 
             return new SearchResult(null, null);

@@ -32,7 +32,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class GatewayBlockEntity extends BlockEntity {
-    public static final double DISTANCE = 18.0;
+    public static final double DISTANCE = 16.0;
     public static final int COOLDOWN = 30;
     public static final float OFFSET = 2.5f;
 
@@ -163,7 +163,7 @@ public class GatewayBlockEntity extends BlockEntity {
         }
     }
 
-    public static void serverTick(ServerLevel level, BlockPos pos, BlockState state, GatewayBlockEntity blockEntity) {
+    public static void serverTick(ServerLevel level, BlockPos pos, @SuppressWarnings("unused") BlockState state, GatewayBlockEntity blockEntity) {
         // If the color is not set yet, lazily search for the second portal
         if (blockEntity.color == 0) {
             PortalDataManager.PortalData search = PortalDataManager.search(level, pos, true);
@@ -190,10 +190,11 @@ public class GatewayBlockEntity extends BlockEntity {
 
         entity.setPortalCooldown();
 
-        PortalDataManager.PortalData search = PortalDataManager.search(level, pos, false);
+        PortalDataManager.PortalData portal = PortalDataManager.search(level, pos, false);
 
-        entity.teleportToWithTicket(search.x(), search.y(), search.z());
-        entity.setYRot(search.direction().toYRot());
+        entity.teleportToWithTicket(portal.x() + 0.5, portal.y(), portal.z() + 0.5);
+        entity.setYHeadRot(portal.direction().toYRot());
+        entity.setYBodyRot(portal.direction().toYRot());
         entity.setDeltaMovement(0.0, 0.0, 0.0);
 
         if (entity instanceof LivingEntity livingEntity) {

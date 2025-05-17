@@ -1,6 +1,7 @@
 package net.conczin.immersive_gateways.block;
 
 import net.conczin.immersive_gateways.BlockEntityTypes;
+import net.conczin.immersive_gateways.config.Config;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.particles.ParticleTypes;
@@ -8,6 +9,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntitySelector;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.BaseEntityBlock;
@@ -64,12 +66,16 @@ public class GatewayBlock extends BaseEntityBlock {
     @Override
     public void entityInside(BlockState state, Level level, BlockPos pos, Entity entity) {
         if (level instanceof ServerLevel serverLevel && canEntityTeleport(entity)) {
-            GatewayBlockEntity.teleportEntity(serverLevel, pos, entity);
+            if (entity.getRootVehicle().isOnPortalCooldown()) {
+                entity.getRootVehicle().setPortalCooldown();
+            } else {
+                GatewayBlockEntity.teleportEntity(serverLevel, pos, entity);
+            }
         }
     }
 
     public static boolean canEntityTeleport(Entity entity) {
-        return EntitySelector.NO_SPECTATORS.test(entity) && !entity.getRootVehicle().isOnPortalCooldown();
+        return EntitySelector.NO_SPECTATORS.test(entity) && (!Config.getInstance().onlyPlayersCanTeleport || entity instanceof Player);
     }
 
     @Override

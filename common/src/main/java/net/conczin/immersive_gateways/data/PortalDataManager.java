@@ -7,26 +7,27 @@ import net.conczin.immersive_gateways.config.Config;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Holder;
+import net.minecraft.core.SectionPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.biome.Biome;
-import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.level.saveddata.SavedData;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 public class PortalDataManager {
     // The search range, or maximum portal size, in chunks
     private static final int RANGE = 2;
 
-    public static long toLong(int x, int y, int z) {
-        return ((long) x << 37) | ((long) y << 27) | z;
+    private static final Utils.TimeBudget budget = new Utils.TimeBudget(Config.getInstance().maxScanningTimePerTickInMS * 1_000_000L);
+
+    public static long toLong(int x, int z) {
+        return ((long) x << 32) | (z & 0xFFFFFFFFL);
     }
 
     public static PortalDataLookup getState(ServerLevel level) {
@@ -77,30 +78,19 @@ public class PortalDataManager {
         // If the portal is not yet found, continue search
         if (portal.iterator != null) {
             while (portal.iterator.hasNext()) {
-                Utils.SearchResult result = portal.iterator.next(lazy ? Config.getInstance().maxScanningTimePerTickInMS : 0);
+                Utils.SearchResult result = portal.iterator.next(lazy ? budget : null);
                 if (result.structure() != null) {
-                    BlockPos adjustedTarget = result.pos();
+                    BlockPos candidate = result.pos();
 
                     // Skip if the portal is already connected
-                    if (state.search(adjustedTarget) != null) {
+                    if (state.search(candidate) != null) {
                         ImmersiveGateways.LOGGER.info("Portal already connected, skipping...");
                         continue;
                     }
 
-                    // Portal found, update its final color and position
-                    ImmersiveGateways.LOGGER.info("Portal found at {}", adjustedTarget);
-                    portal.setColor(getColor(level, adjustedTarget));
-                    portal.setPosition(improvePosition(level, adjustedTarget));
-                    portal.setResolved();
-                    state.setDirty();
-
-                    // Also add the other side
-                    OutroPoint improvedPos = improvePosition(level, pos);
-                    state.add(adjustedTarget, new PortalData(
-                            improvedPos,
-                            getColor(level, pos),
-                            true
-                    ));
+                    // Next phase: remember the candidate and close the iterator
+                    portal.setCandidate(candidate);
+                    portal.setIterator(null);
                     break;
                 } else if (lazy) {
                     // Time constraint reached, wait until the next tick
@@ -113,6 +103,28 @@ public class PortalDataManager {
                 ImmersiveGateways.LOGGER.warn("No nearby portal not found, giving up...");
                 portal.setResolved();
             }
+        }
+
+        // Portal found, once the chunks are loaded, find the exact exit
+        if (portal.candidate() != null) {
+            // TODO: Check if chunks are loaded, but first try a fully threaded solution
+
+            PortalExit secondPortalExit = findExit(level, portal.candidate());
+            ImmersiveGateways.LOGGER.info("Portal found at {}", secondPortalExit.pos());
+
+            // update its final color and position
+            portal.setColor(getColor(level, portal.candidate()));
+            portal.setPosition(secondPortalExit);
+            portal.setResolved();
+
+            // Also add the other side
+            PortalExit exit = findExit(level, pos);
+            state.add(portal.candidate(), new PortalData(
+                    exit,
+                    getColor(level, pos),
+                    true
+            ));
+            state.setDirty();
         }
 
         return portal;
@@ -159,61 +171,126 @@ public class PortalDataManager {
         );
     }
 
-    public record OutroPoint(BlockPos pos, Direction direction) {
-        public OutroPoint(int x, int y, int z, Direction direction) {
+    public record PortalExit(BlockPos pos, Direction direction) {
+        public PortalExit(int x, int y, int z, Direction direction) {
             this(new BlockPos(x, y, z), direction);
         }
     }
 
-    private static OutroPoint improvePosition(ServerLevel level, BlockPos pos) {
-        // The position is known to be next to a portal, but the height can be anything
-        int height = level.getHeight(Heightmap.Types.WORLD_SURFACE, pos.getX(), pos.getZ());
-        int minY = level.getMinBuildHeight();
-        int maxY = level.getMaxBuildHeight();
-        int maxOffset = Math.max(height - minY, maxY - 1 - height);
+    private static PortalExit findExit(ServerLevel level, BlockPos pos) {
+        long time = System.nanoTime();
+        List<PortalExit> portalExits = findExits(level, pos);
+        long delta = System.nanoTime() - time;
+        ImmersiveGateways.LOGGER.info("Exit search took {} ms", delta / 1_000_000);
+        for (PortalExit portalExit : portalExits) {
+            if (level.getBlockState(portalExit.pos).isAir()) {
+                return portalExit;
+            }
+        }
+        return portalExits.get(0);
+    }
 
-        for (int dy = 0; dy <= maxOffset; dy++) {
-            int y = height + ((dy % 2 == 0) ? dy / 2 : -(dy / 2 + 1));
-            if (y < minY || y >= maxY) continue;
-            for (int x = -1; x <= 1; x++) {
-                for (int z = -1; z <= 1; z++) {
-                    BlockPos improvedPos = new BlockPos(pos.getX() + x, y, pos.getZ() + z);
-                    if (level.getBlockState(improvedPos).is(Blocks.GATEWAY.get())) {
-                        // Found a portal, now estimate the size of the portal and return a valid position
-                        BoundingBox boundingBox = estimateSize(level, improvedPos);
-                        if (boundingBox.getXSpan() == 1) {
-                            return new OutroPoint(
-                                    improvedPos.getX() + 1,
-                                    boundingBox.minY(),
-                                    (boundingBox.minZ() + boundingBox.maxZ()) / 2,
-                                    Direction.EAST
-                            );
-                        } else if (boundingBox.getYSpan() == 1) {
-                            return new OutroPoint(
-                                    boundingBox.maxX() + 1,
-                                    improvedPos.getY() + 1,
-                                    (boundingBox.minZ() + boundingBox.maxZ()) / 2,
-                                    Direction.UP
-                            );
-                        } else {
-                            return new OutroPoint(
-                                    (boundingBox.minX() + boundingBox.maxX()) / 2,
-                                    boundingBox.minY(),
-                                    improvedPos.getZ() + 1,
-                                    Direction.SOUTH
-                            );
+    private static BlockPos findBlockInArea(ServerLevel level, BlockPos pos) {
+        BlockPos.MutableBlockPos chunkPos = new BlockPos.MutableBlockPos();
+        int range = 2;
+        for (int cx = SectionPos.blockToSectionCoord(pos.getX()) - range; cx <= SectionPos.blockToSectionCoord(pos.getX()) + range; cx++) {
+            for (int cz = SectionPos.blockToSectionCoord(pos.getZ()) - range; cz <= SectionPos.blockToSectionCoord(pos.getZ()) + range; cz++) {
+                LevelChunk chunk = level.getChunk(cx, cz);
+                for (int cy = 0; cy < chunk.getSectionsCount(); cy++) {
+                    LevelChunkSection section = chunk.getSection(cy);
+                    if (section.hasOnlyAir()) continue;
+                    if (!section.maybeHas(s -> s.is(Blocks.GATEWAY.get()))) continue;
+                    for (int x = 0; x < 16; x++) {
+                        for (int y = 0; y < 16; y++) {
+                            for (int z = 0; z < 16; z++) {
+                                chunkPos.set(
+                                        SectionPos.sectionToBlockCoord(cx, x),
+                                        SectionPos.sectionToBlockCoord(chunk.getSectionYFromSectionIndex(cy), y),
+                                        SectionPos.sectionToBlockCoord(cz, z)
+                                );
+                                if (chunk.getBlockState(chunkPos).is(Blocks.GATEWAY.get())) {
+                                    return chunkPos;
+                                }
+                            }
                         }
                     }
                 }
             }
         }
-        return new OutroPoint(pos, Direction.NORTH);
+        return null;
+    }
+
+    private static List<PortalExit> findExits(ServerLevel level, BlockPos pos) {
+        BlockPos improvedPos = findBlockInArea(level, pos);
+
+        if (improvedPos == null) {
+            ImmersiveGateways.LOGGER.warn("No exit found for portal at {}", pos);
+            return List.of(new PortalExit(pos, Direction.NORTH));
+        }
+
+        // Found a portal, now estimate the size of the portal and return a valid position
+        BoundingBox boundingBox = estimateSize(level, improvedPos);
+        if (boundingBox.getYSpan() > 1) {
+            return List.of(
+                    new PortalExit(
+                            boundingBox.minX() - 1,
+                            boundingBox.minY(),
+                            (boundingBox.minZ() + boundingBox.maxZ()) / 2,
+                            Direction.WEST
+                    ),
+                    new PortalExit(
+                            boundingBox.maxX() + 1,
+                            boundingBox.minY(),
+                            (boundingBox.minZ() + boundingBox.maxZ()) / 2,
+                            Direction.EAST
+                    ),
+                    new PortalExit(
+                            (boundingBox.minX() + boundingBox.maxX()) / 2,
+                            boundingBox.minY(),
+                            boundingBox.minZ() - 1,
+                            Direction.NORTH
+                    ),
+                    new PortalExit(
+                            (boundingBox.minX() + boundingBox.maxX()) / 2,
+                            boundingBox.minY(),
+                            boundingBox.maxZ() + 1,
+                            Direction.SOUTH
+                    )
+            );
+        } else {
+            return List.of(
+                    new PortalExit(
+                            boundingBox.maxX() + 1,
+                            boundingBox.minY() + 1,
+                            (boundingBox.minZ() + boundingBox.maxZ()) / 2,
+                            Direction.UP
+                    ),
+                    new PortalExit(
+                            boundingBox.minX() - 1,
+                            boundingBox.minY() + 1,
+                            (boundingBox.minZ() + boundingBox.maxZ()) / 2,
+                            Direction.UP
+                    ),
+                    new PortalExit(
+                            (boundingBox.minX() + boundingBox.maxX()) / 2,
+                            boundingBox.minY() + 1,
+                            boundingBox.maxZ() + 1,
+                            Direction.UP
+                    ),
+                    new PortalExit(
+                            (boundingBox.minX() + boundingBox.maxX()) / 2,
+                            boundingBox.minY() + 1,
+                            boundingBox.minZ() - 1,
+                            Direction.UP
+                    )
+            );
+        }
     }
 
     private static int getColor(ServerLevel level, BlockPos pos) {
         Holder<Biome> biome = level.getBiome(pos);
         ResourceLocation resourceLocation = biome.unwrapKey().map(ResourceKey::location).orElse(new ResourceLocation("minecraft:plains"));
-        return Config.getInstance().colors.getOrDefault(resourceLocation.toString(), 0x00FF00);
+        return Config.getInstance().colors.getOrDefault(resourceLocation.toString(), biome.value().getFoliageColor());
     }
 
     public static class PortalDataLookup extends SavedData {
@@ -237,7 +314,7 @@ public class PortalDataManager {
         }
 
         public void add(BlockPos pos, PortalData data) {
-            long id = toLong(pos.getX() >> 4, pos.getY() >> 4, pos.getZ() >> 4);
+            long id = toLong(pos.getX() >> 4, pos.getZ() >> 4);
             if (!portals.containsKey(id)) {
                 portals.put(id, data);
                 setDirty();
@@ -246,15 +323,12 @@ public class PortalDataManager {
 
         public PortalData search(BlockPos pos) {
             int cx = pos.getX() >> 4;
-            int cy = pos.getY() >> 4;
             int cz = pos.getZ() >> 4;
             for (int x = cx - RANGE; x <= cx + RANGE; x++) {
-                for (int y = cy - RANGE; y <= cy + RANGE; y++) {
-                    for (int z = cz - RANGE; z <= cz + RANGE; z++) {
-                        long id = toLong(x, y, z);
-                        if (portals.containsKey(id)) {
-                            return portals.get(id);
-                        }
+                for (int z = cz - RANGE; z <= cz + RANGE; z++) {
+                    long id = toLong(x, z);
+                    if (portals.containsKey(id)) {
+                        return portals.get(id);
                     }
                 }
             }
@@ -270,7 +344,9 @@ public class PortalDataManager {
 
         private int color;
         private boolean resolved;
+
         private Utils.NearestMapStructureIterator iterator;
+        private BlockPos candidate;
 
         public PortalData(int x, int y, int z, Direction direction, int color, boolean resolved) {
             this.x = x;
@@ -281,7 +357,7 @@ public class PortalDataManager {
             this.resolved = resolved;
         }
 
-        public PortalData(OutroPoint improvedPos, int color, boolean resolved) {
+        public PortalData(PortalExit improvedPos, int color, boolean resolved) {
             this(improvedPos.pos.getX(), improvedPos.pos.getY(), improvedPos.pos.getZ(), improvedPos.direction, color, resolved);
         }
 
@@ -344,7 +420,15 @@ public class PortalDataManager {
             return resolved;
         }
 
-        public void setPosition(OutroPoint point) {
+        public BlockPos candidate() {
+            return candidate;
+        }
+
+        public void setCandidate(BlockPos pos) {
+            this.candidate = pos;
+        }
+
+        public void setPosition(PortalExit point) {
             this.x = point.pos.getX();
             this.y = point.pos.getY();
             this.z = point.pos.getZ();
