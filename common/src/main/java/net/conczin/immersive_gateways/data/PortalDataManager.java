@@ -24,8 +24,6 @@ public class PortalDataManager {
     // The search range, or maximum portal size, in chunks
     private static final int RANGE = 2;
 
-    private static final Utils.TimeBudget budget = new Utils.TimeBudget(Config.getInstance().maxScanningTimePerTickInMS * 1_000_000L);
-
     public static long toLong(int x, int z) {
         return ((long) x << 32) | (z & 0xFFFFFFFFL);
     }
@@ -34,7 +32,7 @@ public class PortalDataManager {
         return level.getDataStorage().computeIfAbsent(PortalDataLookup::load, PortalDataLookup::new, "immersive_gateways");
     }
 
-    public static PortalData search(ServerLevel level, BlockPos pos, boolean lazy) {
+    public static PortalData search(ServerLevel level, BlockPos pos) {
         PortalDataLookup state = getState(level);
 
         // Check if a known portal is nearby
@@ -60,74 +58,65 @@ public class PortalDataManager {
             ImmersiveGateways.LOGGER.info("New draft portal created.");
         }
 
-        // Create iterator
-        if (!portal.isResolved() && portal.iterator == null) {
-            BlockPos target = new BlockPos(portal.x, portal.y, portal.z);
-            Config c = Config.getInstance();
-            portal.iterator = Utils.getStructureSet(level, ImmersiveGateways.locate("portals"))
-                    .map(s -> new Utils.NearestMapStructureIterator(level, s, target, 0, c.maxScanDistanceInChunks, false))
-                    .orElse(null);
-
-            // In modded scenarios, the structures could be missing
-            if (portal.iterator == null) {
-                ImmersiveGateways.LOGGER.warn("No portal structures found.");
-                portal.setResolved();
-            }
-        }
-
-        // If the portal is not yet found, continue search
-        if (portal.iterator != null) {
-            while (portal.iterator.hasNext()) {
-                Utils.SearchResult result = portal.iterator.next(lazy ? budget : null);
-                if (result.structure() != null) {
-                    BlockPos candidate = result.pos();
-
-                    // Skip if the portal is already connected
-                    if (state.search(candidate) != null) {
-                        ImmersiveGateways.LOGGER.info("Portal already connected, skipping...");
-                        continue;
-                    }
-
-                    // Next phase: remember the candidate and close the iterator
-                    portal.setCandidate(candidate);
-                    portal.setIterator(null);
-                    break;
-                } else if (lazy) {
-                    // Time constraint reached, wait until the next tick
-                    break;
-                }
-            }
-
-            // No portals found, give up
-            if (portal.iterator != null && !portal.iterator.hasNext()) {
-                ImmersiveGateways.LOGGER.warn("No nearby portal not found, giving up...");
-                portal.setResolved();
-            }
-        }
-
-        // Portal found, once the chunks are loaded, find the exact exit
-        if (portal.candidate() != null) {
-            // TODO: Check if chunks are loaded, but first try a fully threaded solution
-
-            PortalExit secondPortalExit = findExit(level, portal.candidate());
-            ImmersiveGateways.LOGGER.info("Portal found at {}", secondPortalExit.pos());
-
-            // update its final color and position
-            portal.setColor(getColor(level, portal.candidate()));
-            portal.setPosition(secondPortalExit);
-            portal.setResolved();
-
-            // Also add the other side
-            PortalExit exit = findExit(level, pos);
-            state.add(portal.candidate(), new PortalData(
-                    exit,
-                    getColor(level, pos),
-                    true
-            ));
-            state.setDirty();
+        // Resolve it
+        if (!portal.isResolved()) {
+            resolve(state, portal, level, pos);
         }
 
         return portal;
+    }
+
+    private static synchronized void resolve(PortalDataLookup state, PortalData portal, ServerLevel level, BlockPos pos) {
+        // Create an iterator over all nearby portal structures
+        BlockPos target = new BlockPos(portal.x, portal.y, portal.z);
+        Config c = Config.getInstance();
+        Utils.NearestMapStructureIterator structures = Utils.getStructureSet(level, ImmersiveGateways.locate("portals"))
+                .map(s -> new Utils.NearestMapStructureIterator(level, s, target, 0, c.maxScanDistanceInChunks, false))
+                .orElse(null);
+
+        // In modded scenarios, the structures could be missing
+        if (structures == null) {
+            ImmersiveGateways.LOGGER.warn("No portal structures found.");
+            portal.setResolved();
+            return;
+        }
+
+        // Iterate over all structures, skip connected ones
+        BlockPos candidate = null;
+        while (structures.hasNext()) {
+            Utils.SearchResult result = structures.next();
+
+            // Skip if the portal is already connected
+            if (state.search(result.pos()) == null) {
+                candidate = result.pos();
+                break;
+            }
+        }
+
+        // No portals found, give up
+        if (candidate == null) {
+            ImmersiveGateways.LOGGER.warn("No nearby portal not found, giving up...");
+            portal.setResolved();
+            return;
+        }
+
+        // Find exact exit position
+        PortalExit secondPortalExit = findExit(level, candidate);
+        ImmersiveGateways.LOGGER.info("Portal found at {}", secondPortalExit.pos());
+
+        // Update its final color and position
+        portal.setColor(getColor(level, candidate));
+        portal.setPosition(secondPortalExit);
+        portal.setResolved();
+
+        // Also add the other side
+        PortalExit exit = findExit(level, pos);
+        state.add(candidate, new PortalData(
+                exit,
+                getColor(level, pos),
+                true
+        ));
+        state.setDirty();
     }
 
     private static BoundingBox estimateSize(ServerLevel level, BlockPos pos) {
@@ -345,9 +334,6 @@ public class PortalDataManager {
         private int color;
         private boolean resolved;
 
-        private Utils.NearestMapStructureIterator iterator;
-        private BlockPos candidate;
-
         public PortalData(int x, int y, int z, Direction direction, int color, boolean resolved) {
             this.x = x;
             this.y = y;
@@ -407,25 +393,12 @@ public class PortalDataManager {
             this.color = color;
         }
 
-        public void setIterator(Utils.NearestMapStructureIterator iterator) {
-            this.iterator = iterator;
-        }
-
         public void setResolved() {
             this.resolved = true;
-            setIterator(null);
         }
 
         public boolean isResolved() {
             return resolved;
-        }
-
-        public BlockPos candidate() {
-            return candidate;
-        }
-
-        public void setCandidate(BlockPos pos) {
-            this.candidate = pos;
         }
 
         public void setPosition(PortalExit point) {

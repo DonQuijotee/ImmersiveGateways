@@ -30,6 +30,8 @@ import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 
 public class GatewayBlockEntity extends BlockEntity {
     public static final double DISTANCE = 16.0;
@@ -163,14 +165,21 @@ public class GatewayBlockEntity extends BlockEntity {
         }
     }
 
+    static Executor executor = Executors.newSingleThreadExecutor();
+
     public static void serverTick(ServerLevel level, BlockPos pos, @SuppressWarnings("unused") BlockState state, GatewayBlockEntity blockEntity) {
         // If the color is not set yet, lazily search for the second portal
         if (blockEntity.color == 0) {
-            PortalDataManager.PortalData search = PortalDataManager.search(level, pos, true);
-            if (search.isResolved()) {
-                blockEntity.setColor(search.color());
-                level.getChunkSource().blockChanged(pos);
-            }
+            blockEntity.color = 1;
+
+            // Run future
+            executor.execute(() -> {
+                PortalDataManager.PortalData search = PortalDataManager.search(level, pos);
+                if (search.isResolved()) {
+                    blockEntity.setColor(search.color());
+                    level.getChunkSource().blockChanged(pos);
+                }
+            });
         }
     }
 
@@ -190,7 +199,7 @@ public class GatewayBlockEntity extends BlockEntity {
 
         entity.setPortalCooldown();
 
-        PortalDataManager.PortalData portal = PortalDataManager.search(level, pos, false);
+        PortalDataManager.PortalData portal = PortalDataManager.search(level, pos);
 
         entity.teleportToWithTicket(portal.x() + 0.5, portal.y(), portal.z() + 0.5);
         entity.setYHeadRot(portal.direction().toYRot());
