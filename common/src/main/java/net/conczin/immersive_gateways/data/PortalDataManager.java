@@ -32,6 +32,9 @@ public class PortalDataManager {
         return level.getDataStorage().computeIfAbsent(PortalDataLookup::load, PortalDataLookup::new, "immersive_gateways");
     }
 
+    /**
+     * Searches for a portal pair at the given position, or creates a new portal if none is found.
+     */
     public static PortalData search(ServerLevel level, BlockPos pos) {
         PortalDataLookup state = getState(level);
 
@@ -66,6 +69,9 @@ public class PortalDataManager {
         return portal;
     }
 
+    /**
+     * Looks for the exit position of the portal and connects it to the other side.
+     */
     private static synchronized void resolve(PortalDataLookup state, PortalData portal, ServerLevel level, BlockPos pos) {
         // Create an iterator over all nearby portal structures
         BlockPos target = new BlockPos(portal.x, portal.y, portal.z);
@@ -100,7 +106,7 @@ public class PortalDataManager {
             return;
         }
 
-        // Find exact exit position
+        // Find the exact exit position
         PortalExit secondPortalExit = findExit(level, candidate);
         ImmersiveGateways.LOGGER.info("Portal found at {}", secondPortalExit.pos());
 
@@ -119,7 +125,10 @@ public class PortalDataManager {
         state.setDirty();
     }
 
-    private static BoundingBox estimateSize(ServerLevel level, BlockPos pos) {
+    /**
+     * Estimates the bounding box of the portal by searching for connected blocks.
+     */
+    private static BoundingBox estimateBoundingBox(ServerLevel level, BlockPos pos) {
         int minX = pos.getX(), minY = pos.getY(), minZ = pos.getZ();
         int maxX = pos.getX(), maxY = pos.getY(), maxZ = pos.getZ();
 
@@ -168,7 +177,7 @@ public class PortalDataManager {
 
     private static PortalExit findExit(ServerLevel level, BlockPos pos) {
         long time = System.nanoTime();
-        List<PortalExit> portalExits = findExits(level, pos);
+        List<PortalExit> portalExits = findExitCandidates(level, pos);
         long delta = System.nanoTime() - time;
         ImmersiveGateways.LOGGER.info("Exit search took {} ms", delta / 1_000_000);
         for (PortalExit portalExit : portalExits) {
@@ -179,6 +188,80 @@ public class PortalDataManager {
         return portalExits.get(0);
     }
 
+    /**
+     * Finds possible exits of a portal at the given position.
+     */
+    private static List<PortalExit> findExitCandidates(ServerLevel level, BlockPos pos) {
+        BlockPos improvedPos = findBlockInArea(level, pos);
+
+        if (improvedPos == null) {
+            ImmersiveGateways.LOGGER.warn("No exit found for portal at {}", pos);
+            return List.of(new PortalExit(pos, Direction.NORTH));
+        }
+
+        // Found a portal, now estimate the size of the portal and return a valid position
+        BoundingBox boundingBox = estimateBoundingBox(level, improvedPos);
+        if (boundingBox.getYSpan() > 1) {
+            return List.of(
+                    new PortalExit(
+                            boundingBox.minX() - 1,
+                            boundingBox.minY(),
+                            (boundingBox.minZ() + boundingBox.maxZ()) / 2,
+                            Direction.WEST
+                    ),
+                    new PortalExit(
+                            boundingBox.maxX() + 1,
+                            boundingBox.minY(),
+                            (boundingBox.minZ() + boundingBox.maxZ()) / 2,
+                            Direction.EAST
+                    ),
+                    new PortalExit(
+                            (boundingBox.minX() + boundingBox.maxX()) / 2,
+                            boundingBox.minY(),
+                            boundingBox.minZ() - 1,
+                            Direction.NORTH
+                    ),
+                    new PortalExit(
+                            (boundingBox.minX() + boundingBox.maxX()) / 2,
+                            boundingBox.minY(),
+                            boundingBox.maxZ() + 1,
+                            Direction.SOUTH
+                    )
+            );
+        } else {
+            // This is a horizontal portal
+            return List.of(
+                    new PortalExit(
+                            boundingBox.maxX() + 1,
+                            boundingBox.minY() + 1,
+                            (boundingBox.minZ() + boundingBox.maxZ()) / 2,
+                            Direction.UP
+                    ),
+                    new PortalExit(
+                            boundingBox.minX() - 1,
+                            boundingBox.minY() + 1,
+                            (boundingBox.minZ() + boundingBox.maxZ()) / 2,
+                            Direction.UP
+                    ),
+                    new PortalExit(
+                            (boundingBox.minX() + boundingBox.maxX()) / 2,
+                            boundingBox.minY() + 1,
+                            boundingBox.maxZ() + 1,
+                            Direction.UP
+                    ),
+                    new PortalExit(
+                            (boundingBox.minX() + boundingBox.maxX()) / 2,
+                            boundingBox.minY() + 1,
+                            boundingBox.minZ() - 1,
+                            Direction.UP
+                    )
+            );
+        }
+    }
+
+    /**
+     * Finds a gateway block in the area around the given position.
+     */
     private static BlockPos findBlockInArea(ServerLevel level, BlockPos pos) {
         BlockPos.MutableBlockPos chunkPos = new BlockPos.MutableBlockPos();
         int range = 2;
@@ -209,73 +292,6 @@ public class PortalDataManager {
         return null;
     }
 
-    private static List<PortalExit> findExits(ServerLevel level, BlockPos pos) {
-        BlockPos improvedPos = findBlockInArea(level, pos);
-
-        if (improvedPos == null) {
-            ImmersiveGateways.LOGGER.warn("No exit found for portal at {}", pos);
-            return List.of(new PortalExit(pos, Direction.NORTH));
-        }
-
-        // Found a portal, now estimate the size of the portal and return a valid position
-        BoundingBox boundingBox = estimateSize(level, improvedPos);
-        if (boundingBox.getYSpan() > 1) {
-            return List.of(
-                    new PortalExit(
-                            boundingBox.minX() - 1,
-                            boundingBox.minY(),
-                            (boundingBox.minZ() + boundingBox.maxZ()) / 2,
-                            Direction.WEST
-                    ),
-                    new PortalExit(
-                            boundingBox.maxX() + 1,
-                            boundingBox.minY(),
-                            (boundingBox.minZ() + boundingBox.maxZ()) / 2,
-                            Direction.EAST
-                    ),
-                    new PortalExit(
-                            (boundingBox.minX() + boundingBox.maxX()) / 2,
-                            boundingBox.minY(),
-                            boundingBox.minZ() - 1,
-                            Direction.NORTH
-                    ),
-                    new PortalExit(
-                            (boundingBox.minX() + boundingBox.maxX()) / 2,
-                            boundingBox.minY(),
-                            boundingBox.maxZ() + 1,
-                            Direction.SOUTH
-                    )
-            );
-        } else {
-            return List.of(
-                    new PortalExit(
-                            boundingBox.maxX() + 1,
-                            boundingBox.minY() + 1,
-                            (boundingBox.minZ() + boundingBox.maxZ()) / 2,
-                            Direction.UP
-                    ),
-                    new PortalExit(
-                            boundingBox.minX() - 1,
-                            boundingBox.minY() + 1,
-                            (boundingBox.minZ() + boundingBox.maxZ()) / 2,
-                            Direction.UP
-                    ),
-                    new PortalExit(
-                            (boundingBox.minX() + boundingBox.maxX()) / 2,
-                            boundingBox.minY() + 1,
-                            boundingBox.maxZ() + 1,
-                            Direction.UP
-                    ),
-                    new PortalExit(
-                            (boundingBox.minX() + boundingBox.maxX()) / 2,
-                            boundingBox.minY() + 1,
-                            boundingBox.minZ() - 1,
-                            Direction.UP
-                    )
-            );
-        }
-    }
-
     private static int getColor(ServerLevel level, BlockPos pos) {
         Holder<Biome> biome = level.getBiome(pos);
         ResourceLocation resourceLocation = biome.unwrapKey().map(ResourceKey::location).orElse(new ResourceLocation("minecraft:plains"));
@@ -295,11 +311,10 @@ public class PortalDataManager {
 
         @Override
         public CompoundTag save(CompoundTag nbt) {
-            CompoundTag c = new CompoundTag();
             for (Map.Entry<Long, PortalData> entry : portals.entrySet()) {
-                c.put(Long.toString(entry.getKey()), entry.getValue().save());
+                nbt.put(Long.toString(entry.getKey()), entry.getValue().save());
             }
-            return c;
+            return nbt;
         }
 
         public void add(BlockPos pos, PortalData data) {

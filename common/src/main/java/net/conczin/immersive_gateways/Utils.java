@@ -50,7 +50,7 @@ public class Utils {
                 }
             }
 
-            // Create chunk position iterator
+            // Create a chunk position iterator
             if (this.placements.isEmpty()) {
                 this.chunkPosIterator = Collections.emptyIterator();
             } else {

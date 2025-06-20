@@ -1,7 +1,5 @@
 # TODO
 
-* Teleport to closest free spot
+* Multiloader and retire cobalt
 * Teleportation cooldown
-* Configurable white and blacklist
 * Particles!
-* Custom config biome colors
