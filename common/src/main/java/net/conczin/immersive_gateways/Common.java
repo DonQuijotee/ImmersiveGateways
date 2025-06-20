@@ -5,7 +5,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 
-public class ImmersiveGateways {
+public class Common {
     public static final String MOD_ID = "immersive_gateways";
     public static final Logger LOGGER = LogManager.getLogger();
 
@@ -15,5 +15,9 @@ public class ImmersiveGateways {
 
     public static ResourceLocation locate(String name) {
         return new ResourceLocation(MOD_ID, name);
+    }
+
+    public interface RegisterHelper<T> {
+        void register(ResourceLocation name, T value);
     }
 }

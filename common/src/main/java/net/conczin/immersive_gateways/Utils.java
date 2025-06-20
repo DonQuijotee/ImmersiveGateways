@@ -67,7 +67,7 @@ public class Utils {
         public SearchResult next() {
             while (hasNext()) {
                 if (scannedChunks++ % 1000 == 0) {
-                    ImmersiveGateways.LOGGER.info("Scanned {} chunks", scannedChunks);
+                    Common.LOGGER.info("Scanned {} chunks", scannedChunks);
                 }
 
                 ChunkPos position = chunkPosIterator.next();

@@ -47,7 +47,7 @@ public class GatewayBlock extends BaseEntityBlock {
 
     @Nullable
     public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state, BlockEntityType<T> blockEntityType) {
-        return createTickerHelper(blockEntityType, BlockEntityTypes.GATEWAY.get(), getTicker(level));
+        return createTickerHelper(blockEntityType, BlockEntityTypes.GATEWAY, getTicker(level));
     }
 
     public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level) {

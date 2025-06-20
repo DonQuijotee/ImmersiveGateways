@@ -1,27 +1,30 @@
 package net.conczin.immersive_gateways;
 
-import com.mojang.datafixers.types.Type;
 import net.conczin.immersive_gateways.block.GatewayBlockEntity;
-import net.conczin.immersive_gateways.cobalt.Registration;
-import net.minecraft.Util;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.util.datafix.fixes.References;
+import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.world.level.block.state.BlockState;
 
-import java.util.function.Supplier;
+public class BlockEntityTypes {
+    public static BlockEntityType<GatewayBlockEntity> GATEWAY;
 
-public interface BlockEntityTypes {
-    Supplier<BlockEntityType<GatewayBlockEntity>> GATEWAY = register("gateway", () -> Registration.blockEntityTypeBuilder(GatewayBlockEntity::new, Blocks.GATEWAY.get()));
-
-    static <T extends BlockEntity> Supplier<BlockEntityType<T>> register(String name, Supplier<BlockEntityType.Builder<T>> type) {
-        Type<?> datafixerType = Util.fetchChoiceType(References.BLOCK_ENTITY, name);
-        return Registration.register(BuiltInRegistries.BLOCK_ENTITY_TYPE, ImmersiveGateways.locate(name), () -> {
-            assert datafixerType != null;
-            return type.get().build(datafixerType);
-        });
+    public interface TriFunction<E extends BlockEntity> {
+        BlockEntityType<E> apply(ResourceLocation name, BlockEntitySupplier<E> constructor, Block block);
     }
 
-    static void bootstrap() {
+    public interface BlockEntitySupplier<T extends BlockEntity> {
+        T create(BlockPos pos, BlockState state);
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public static void register(TriFunction register) {
+        GATEWAY = register.apply(
+                Common.locate("gateway"),
+                GatewayBlockEntity::new,
+                Blocks.GATEWAY
+        );
     }
 }

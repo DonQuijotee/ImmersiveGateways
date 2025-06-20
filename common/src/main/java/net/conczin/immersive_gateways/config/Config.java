@@ -1,6 +1,6 @@
 package net.conczin.immersive_gateways.config;
 
-import net.conczin.immersive_gateways.ImmersiveGateways;
+import net.conczin.immersive_gateways.Common;
 
 import java.util.Map;
 
@@ -8,7 +8,7 @@ public final class Config extends JsonConfig {
     private static final Config INSTANCE = loadOrCreate(new Config(), Config.class);
 
     public Config() {
-        super(ImmersiveGateways.MOD_ID);
+        super(Common.MOD_ID);
     }
 
     public static Config getInstance() {

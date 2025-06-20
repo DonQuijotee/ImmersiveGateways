@@ -2,7 +2,7 @@ package net.conczin.immersive_gateways.block;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.conczin.immersive_gateways.ImmersiveGateways;
+import net.conczin.immersive_gateways.Common;
 import net.conczin.immersive_gateways.Utils;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
@@ -15,7 +15,7 @@ import org.joml.Math;
 import org.joml.*;
 
 public class GatewayBlockEntityRenderer<T extends GatewayBlockEntity> implements BlockEntityRenderer<T> {
-    public static final ResourceLocation BLANK_LOCATION = ImmersiveGateways.locate("textures/entity/white.png");
+    public static final ResourceLocation BLANK_LOCATION = Common.locate("textures/entity/white.png");
 
     public static final Vector3f[] NORMALS = new Vector3f[]{
             new Vector3f(0.0f, 0.0f, -1.0f),

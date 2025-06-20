@@ -8,6 +8,6 @@
     "defaultRequire": 1
   },
   "client": [
-    "client.ItemPropertiesAccessor", "client.LevelRendererMixin"
+    "client.LevelRendererMixin"
   ]
 }

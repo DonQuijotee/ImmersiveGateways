@@ -26,7 +26,7 @@ public class GatewayItem extends Item {
             pos = pos.offset(direction.getNormal());
             BlockState state = level.getBlockState(pos);
             if (state.isAir()) {
-                BlockState blockState = Blocks.GATEWAY.get().defaultBlockState().setValue(GatewayBlock.AXIS, axis);
+                BlockState blockState = Blocks.GATEWAY.defaultBlockState().setValue(GatewayBlock.AXIS, axis);
                 level.setBlock(pos, blockState, 3);
             }
         }

@@ -1,6 +1,6 @@
 package net.conczin.immersive_gateways;
 
-public class ImmersiveGatewaysClient {
+public class Client {
     public static void init() {
         // nop
     }

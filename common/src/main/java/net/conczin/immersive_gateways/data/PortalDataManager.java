@@ -1,7 +1,7 @@
 package net.conczin.immersive_gateways.data;
 
 import net.conczin.immersive_gateways.Blocks;
-import net.conczin.immersive_gateways.ImmersiveGateways;
+import net.conczin.immersive_gateways.Common;
 import net.conczin.immersive_gateways.Utils;
 import net.conczin.immersive_gateways.config.Config;
 import net.minecraft.core.BlockPos;
@@ -58,7 +58,7 @@ public class PortalDataManager {
                     false
             );
             state.add(pos, portal);
-            ImmersiveGateways.LOGGER.info("New draft portal created.");
+            Common.LOGGER.info("New draft portal created.");
         }
 
         // Resolve it
@@ -76,13 +76,13 @@ public class PortalDataManager {
         // Create an iterator over all nearby portal structures
         BlockPos target = new BlockPos(portal.x, portal.y, portal.z);
         Config c = Config.getInstance();
-        Utils.NearestMapStructureIterator structures = Utils.getStructureSet(level, ImmersiveGateways.locate("portals"))
+        Utils.NearestMapStructureIterator structures = Utils.getStructureSet(level, Common.locate("portals"))
                 .map(s -> new Utils.NearestMapStructureIterator(level, s, target, 0, c.maxScanDistanceInChunks, false))
                 .orElse(null);
 
         // In modded scenarios, the structures could be missing
         if (structures == null) {
-            ImmersiveGateways.LOGGER.warn("No portal structures found.");
+            Common.LOGGER.warn("No portal structures found.");
             portal.setResolved();
             return;
         }
@@ -101,14 +101,14 @@ public class PortalDataManager {
 
         // No portals found, give up
         if (candidate == null) {
-            ImmersiveGateways.LOGGER.warn("No nearby portal not found, giving up...");
+            Common.LOGGER.warn("No nearby portal not found, giving up...");
             portal.setResolved();
             return;
         }
 
         // Find the exact exit position
         PortalExit secondPortalExit = findExit(level, candidate);
-        ImmersiveGateways.LOGGER.info("Portal found at {}", secondPortalExit.pos());
+        Common.LOGGER.info("Portal found at {}", secondPortalExit.pos());
 
         // Update its final color and position
         portal.setColor(getColor(level, candidate));
@@ -141,7 +141,7 @@ public class PortalDataManager {
             open.remove(current);
 
             // Check if the block is a portal
-            if (level.getBlockState(current).is(Blocks.GATEWAY.get())) {
+            if (level.getBlockState(current).is(Blocks.GATEWAY)) {
                 minX = Math.min(minX, current.getX());
                 minY = Math.min(minY, current.getY());
                 minZ = Math.min(minZ, current.getZ());
@@ -179,7 +179,7 @@ public class PortalDataManager {
         long time = System.nanoTime();
         List<PortalExit> portalExits = findExitCandidates(level, pos);
         long delta = System.nanoTime() - time;
-        ImmersiveGateways.LOGGER.info("Exit search took {} ms", delta / 1_000_000);
+        Common.LOGGER.info("Exit search took {} ms", delta / 1_000_000);
         for (PortalExit portalExit : portalExits) {
             if (level.getBlockState(portalExit.pos).isAir()) {
                 return portalExit;
@@ -195,7 +195,7 @@ public class PortalDataManager {
         BlockPos improvedPos = findBlockInArea(level, pos);
 
         if (improvedPos == null) {
-            ImmersiveGateways.LOGGER.warn("No exit found for portal at {}", pos);
+            Common.LOGGER.warn("No exit found for portal at {}", pos);
             return List.of(new PortalExit(pos, Direction.NORTH));
         }
 
@@ -271,7 +271,7 @@ public class PortalDataManager {
                 for (int cy = 0; cy < chunk.getSectionsCount(); cy++) {
                     LevelChunkSection section = chunk.getSection(cy);
                     if (section.hasOnlyAir()) continue;
-                    if (!section.maybeHas(s -> s.is(Blocks.GATEWAY.get()))) continue;
+                    if (!section.maybeHas(s -> s.is(Blocks.GATEWAY))) continue;
                     for (int x = 0; x < 16; x++) {
                         for (int y = 0; y < 16; y++) {
                             for (int z = 0; z < 16; z++) {
@@ -280,7 +280,7 @@ public class PortalDataManager {
                                         SectionPos.sectionToBlockCoord(chunk.getSectionYFromSectionIndex(cy), y),
                                         SectionPos.sectionToBlockCoord(cz, z)
                                 );
-                                if (chunk.getBlockState(chunkPos).is(Blocks.GATEWAY.get())) {
+                                if (chunk.getBlockState(chunkPos).is(Blocks.GATEWAY)) {
                                     return chunkPos;
                                 }
                             }

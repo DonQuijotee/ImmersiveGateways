@@ -1,5 +1,3 @@
-# TODO
+# 0.0.1
 
-* Multiloader and retire cobalt
-* Teleportation cooldown
-* Particles!
+Initial release

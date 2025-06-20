@@ -106,7 +106,7 @@ public class GatewayBlockEntity extends BlockEntity {
     }
 
     public GatewayBlockEntity(BlockPos pos, BlockState blockState) {
-        super(BlockEntityTypes.GATEWAY.get(), pos, blockState);
+        super(BlockEntityTypes.GATEWAY, pos, blockState);
 
         rotations = new Quaternionf[]{
                 randomQuaternion(),
@@ -158,9 +158,9 @@ public class GatewayBlockEntity extends BlockEntity {
             // Sound
             float threshold = 0.75f;
             if (blockEntity.time[i] > threshold && blockEntity.lastTime[i] <= threshold) {
-                playSound(level, pos, Sounds.ASSEMBLE.get());
+                playSound(level, pos, Sounds.ASSEMBLE);
             } else if (blockEntity.time[i] <= threshold && blockEntity.lastTime[i] > threshold) {
-                playSound(level, pos, Sounds.DISASSEMBLE.get());
+                playSound(level, pos, Sounds.DISASSEMBLE);
             }
         }
     }
@@ -195,7 +195,7 @@ public class GatewayBlockEntity extends BlockEntity {
     }
 
     public static void teleportEntity(ServerLevel level, BlockPos pos, Entity entity) {
-        entity.playSound(Sounds.GATEWAY.get(), 1.0f, 1.0f);
+        entity.playSound(Sounds.GATEWAY, 1.0f, 1.0f);
 
         entity.setPortalCooldown();
 
