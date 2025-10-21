@@ -76,7 +76,7 @@ public class PortalDataManager {
         // Create an iterator over all nearby portal structures
         BlockPos target = new BlockPos(portal.x, portal.y, portal.z);
         Config c = Config.getInstance();
-        Utils.NearestMapStructureIterator structures = Utils.getStructureSet(level, Common.locate("portals"))
+        Utils.NearestMapStructureIterator structures = Utils.getStructureSet(level, Common.locate("portal"))
                 .map(s -> new Utils.NearestMapStructureIterator(level, s, target, 0, c.maxScanDistanceInChunks, false))
                 .orElse(null);
 

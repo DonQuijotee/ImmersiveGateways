@@ -11,7 +11,11 @@
   },
   "structures": [
     {
-      "structure": "immersive_gateways:test",
+      "structure": "immersive_gateways:plains",
+      "weight": 1
+    },
+    {
+      "structure": "immersive_gateways:cherry_grove",
       "weight": 1
     }
   ]

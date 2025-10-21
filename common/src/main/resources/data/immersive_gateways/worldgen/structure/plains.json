@@ -1,7 +1,8 @@
 {
   "type": "jigsaw",
-  "biomes": "#immersive_gateways:has_structure/test",
-  "step": "underground_structures",
+  "biomes": "#immersive_gateways:has_structure/plains_portal",
+  "step": "surface_structures",
+  "project_start_to_heightmap": "OCEAN_FLOOR",
   "terrain_adaptation": "beard_thin",
   "size": 1,
   "max_distance_from_center": 80,
@@ -11,7 +12,7 @@
       {
         "element": {
           "element_type": "minecraft:legacy_single_pool_element",
-          "location": "immersive_gateways:test_0",
+          "location": "immersive_gateways:plains/0",
           "processors": {
             "processors": []
           },
@@ -23,7 +24,8 @@
     "fallback": "minecraft:empty"
   },
   "start_height": {
-    "absolute": 0
+    "type": "constant",
+    "absolute": -8
   },
   "use_expansion_hack": false
 }

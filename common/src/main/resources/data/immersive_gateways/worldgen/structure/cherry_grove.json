@@ -1,6 +1,6 @@
 {
   "type": "jigsaw",
-  "biomes": "#immersive_gateways:has_structure/test",
+  "biomes": "#immersive_gateways:has_structure/cherry_grove_portal",
   "step": "surface_structures",
   "project_start_to_heightmap": "OCEAN_FLOOR",
   "terrain_adaptation": "beard_thin",
@@ -12,7 +12,7 @@
       {
         "element": {
           "element_type": "minecraft:legacy_single_pool_element",
-          "location": "immersive_gateways:test_0",
+          "location": "immersive_gateways:cherry_grove/0",
           "processors": {
             "processors": []
           },
@@ -24,7 +24,8 @@
     "fallback": "minecraft:empty"
   },
   "start_height": {
-    "absolute": 0
+    "type": "constant",
+    "absolute": -9
   },
   "use_expansion_hack": false
 }
