@@ -35,7 +35,7 @@ public class PortalDataManager {
     /**
      * Searches for a portal pair at the given position, or creates a new portal if none is found.
      */
-    public static PortalData search(ServerLevel level, BlockPos pos) {
+    public static PortalData search(ServerLevel level, BlockPos pos, boolean resolve) {
         PortalDataLookup state = getState(level);
 
         // Check if a known portal is nearby
@@ -62,7 +62,7 @@ public class PortalDataManager {
         }
 
         // Resolve it
-        if (!portal.isResolved()) {
+        if (resolve && !portal.isResolved()) {
             resolve(state, portal, level, pos);
         }
 

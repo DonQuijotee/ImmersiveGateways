@@ -8,6 +8,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.IntTag;
+import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvent;
@@ -174,7 +175,7 @@ public class GatewayBlockEntity extends BlockEntity {
 
             // Run future
             executor.execute(() -> {
-                PortalDataManager.PortalData search = PortalDataManager.search(level, pos);
+                PortalDataManager.PortalDestination search = PortalDataManager.search(level, pos, true);
                 if (search.isResolved()) {
                     blockEntity.setColor(search.color());
                     level.getChunkSource().blockChanged(pos);
@@ -199,7 +200,11 @@ public class GatewayBlockEntity extends BlockEntity {
 
         entity.setPortalCooldown();
 
-        PortalDataManager.PortalData portal = PortalDataManager.search(level, pos);
+        PortalDataManager.PortalDestination portal = PortalDataManager.search(level, pos, false);
+        if (!portal.isResolved()) {
+            entity.sendSystemMessage(Component.translatable("immersive_gateways.not_loaded_yet"));
+            return;
+        }
 
         entity.teleportToWithTicket(portal.x() + 0.5, portal.y(), portal.z() + 0.5);
         entity.setYHeadRot(portal.direction().toYRot());
