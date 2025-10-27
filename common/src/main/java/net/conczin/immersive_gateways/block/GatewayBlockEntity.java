@@ -21,7 +21,6 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import org.jetbrains.annotations.NotNull;
 import org.joml.Quaternionf;
 import org.joml.Vector2f;
 import org.joml.Vector3d;
@@ -79,7 +78,7 @@ public class GatewayBlockEntity extends BlockEntity {
         return new Vector3f(offset.x() + getRandom() * OFFSET, offset.y() + getRandom() * OFFSET, offset.z() + getRandom() * OFFSET);
     }
 
-    private Vector3f @NotNull [] getOffsets(Vector3f[] offset) {
+    private Vector3f [] getOffsets(Vector3f[] offset) {
         return new Vector3f[]{
                 offsetVector(offset[0]),
                 offsetVector(offset[1]),
@@ -175,11 +174,9 @@ public class GatewayBlockEntity extends BlockEntity {
 
             // Run future
             executor.execute(() -> {
-                PortalDataManager.PortalDestination search = PortalDataManager.search(level, pos, true);
-                if (search.isResolved()) {
-                    blockEntity.setColor(search.color());
-                    level.getChunkSource().blockChanged(pos);
-                }
+                PortalDataManager.PortalPair pair = PortalDataManager.search(level, pos, true);
+                blockEntity.setColor(pair.getTarget(pos).color());
+                level.getChunkSource().blockChanged(pos);
             });
         }
     }
@@ -197,23 +194,31 @@ public class GatewayBlockEntity extends BlockEntity {
 
     public static void teleportEntity(ServerLevel level, BlockPos pos, Entity entity) {
         entity.playSound(Sounds.GATEWAY, 1.0f, 1.0f);
-
         entity.setPortalCooldown();
 
-        PortalDataManager.PortalDestination portal = PortalDataManager.search(level, pos, false);
-        if (!portal.isResolved()) {
+        // Find exist
+        PortalDataManager.PortalPair pair = PortalDataManager.search(level, pos, false);
+        PortalDataManager.Portal portal = pair.getTarget(pos);
+
+        if (!portal.resolved()) {
             entity.sendSystemMessage(Component.translatable("immersive_gateways.not_loaded_yet"));
             return;
         }
 
-        entity.teleportToWithTicket(portal.x() + 0.5, portal.y(), portal.z() + 0.5);
-        entity.setYHeadRot(portal.direction().toYRot());
-        entity.setYBodyRot(portal.direction().toYRot());
-        entity.setDeltaMovement(0.0, 0.0, 0.0);
-
+        // Hide the transition
         if (entity instanceof LivingEntity livingEntity) {
             livingEntity.addEffect(new MobEffectInstance(MobEffects.BLINDNESS, 50, 0));
         }
+
+        // Find a safe position to teleport
+        BlockPos targetPos = portal.getSafePosition(level, entity);
+        BlockPos subtract = targetPos.subtract(portal.boundingBox().getCenter());
+        float targetYRot = (float) (Math.atan2(subtract.getZ(), subtract.getX()) * (180.0 / (float) Math.PI) - 90.0);
+
+        entity.teleportToWithTicket(targetPos.getX() + 0.5, targetPos.getY(), targetPos.getZ() + 0.5);
+        entity.setYHeadRot(targetYRot);
+        entity.setYBodyRot(targetYRot);
+        entity.setDeltaMovement(0.0, 0.0, 0.0);
     }
 
     @Override
