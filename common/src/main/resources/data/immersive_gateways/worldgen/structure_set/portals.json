@@ -1,21 +1,109 @@
 {
   "placement": {
     "type": "minecraft:random_spread",
-    "exclusion_zone": {
-      "chunk_count": 1,
-      "other_set": []
-    },
-    "spacing": 7,
-    "separation": 2,
+    "spacing": 40,
+    "separation": 8,
     "salt": 74858347
   },
   "structures": [
     {
-      "structure": "immersive_gateways:plains",
+      "structure": "immersive_gateways:plains/0",
       "weight": 1
     },
     {
-      "structure": "immersive_gateways:cherry_grove",
+      "structure": "immersive_gateways:plains/1",
+      "weight": 1
+    },
+    {
+      "structure": "immersive_gateways:plains/2",
+      "weight": 1
+    },
+    {
+      "structure": "immersive_gateways:cherry_grove/0",
+      "weight": 1
+    },
+    {
+      "structure": "immersive_gateways:cherry_grove/1",
+      "weight": 1
+    },
+    {
+      "structure": "immersive_gateways:cherry_grove/2",
+      "weight": 1
+    },
+    {
+      "structure": "immersive_gateways:badlands/0",
+      "weight": 1
+    },
+    {
+      "structure": "immersive_gateways:badlands/1",
+      "weight": 1
+    },
+    {
+      "structure": "immersive_gateways:badlands/2",
+      "weight": 1
+    },
+    {
+      "structure": "immersive_gateways:desert/0",
+      "weight": 1
+    },
+    {
+      "structure": "immersive_gateways:desert/1",
+      "weight": 1
+    },
+    {
+      "structure": "immersive_gateways:ice/0",
+      "weight": 1
+    },
+    {
+      "structure": "immersive_gateways:ice/1",
+      "weight": 1
+    },
+    {
+      "structure": "immersive_gateways:jungle/0",
+      "weight": 1
+    },
+    {
+      "structure": "immersive_gateways:jungle/1",
+      "weight": 1
+    },
+    {
+      "structure": "immersive_gateways:jungle/2",
+      "weight": 1
+    },
+    {
+      "structure": "immersive_gateways:mangrove_swamp/0",
+      "weight": 1
+    },
+    {
+      "structure": "immersive_gateways:mangrove_swamp/1",
+      "weight": 1
+    },
+    {
+      "structure": "immersive_gateways:mangrove_swamp/2",
+      "weight": 1
+    },
+    {
+      "structure": "immersive_gateways:mountain/0",
+      "weight": 1
+    },
+    {
+      "structure": "immersive_gateways:mountain/1",
+      "weight": 1
+    },
+    {
+      "structure": "immersive_gateways:mushroom/0",
+      "weight": 1
+    },
+    {
+      "structure": "immersive_gateways:mushroom/1",
+      "weight": 1
+    },
+    {
+      "structure": "immersive_gateways:mushroom/2",
+      "weight": 1
+    },
+    {
+      "structure": "immersive_gateways:swamp/0",
       "weight": 1
     }
   ]

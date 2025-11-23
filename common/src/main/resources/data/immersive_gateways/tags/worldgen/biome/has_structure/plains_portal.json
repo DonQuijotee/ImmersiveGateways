@@ -1,9 +1,9 @@
 {
   "values": [
-    "#minecraft:is_jungle",
-    "minecraft:desert",
-    "minecraft:snowy_taiga",
-    "minecraft:snowy_plains",
-    "minecraft:snowy_slopes"
+    "#minecraft:is_hill",
+    "#minecraft:is_forest",
+    "minecraft:plains",
+    "minecraft:sunflower_plains",
+    "minecraft:meadow"
   ]
 }

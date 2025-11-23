@@ -17,6 +17,8 @@ import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import java.util.HashSet;
 import java.util.Set;
 
+import static net.minecraft.world.level.block.Blocks.CAVE_AIR;
+
 public class GatewayItem extends Item {
     public GatewayItem(Properties properties) {
         super(properties);
@@ -60,6 +62,38 @@ public class GatewayItem extends Item {
         return new BoundingBox(minX, minY, minZ, maxX, maxY, maxZ);
     }
 
+    private void fillCaveAir(Level level, BlockPos pos) {
+        Set<BlockPos> done = new HashSet<>();
+        Set<BlockPos> todo = new HashSet<>();
+        Set<BlockPos> toReplace = new HashSet<>();
+        todo.add(pos);
+
+        while (!todo.isEmpty()) {
+            BlockPos current = todo.iterator().next();
+            todo.remove(current);
+            done.add(current);
+
+            if (level.getBlockState(current).isAir()) {
+                toReplace.add(current);
+                for (Direction direction : Direction.values()) {
+                    BlockPos neighbor = current.relative(direction);
+                    if (neighbor.getY() <= pos.getY() && !done.contains(neighbor)) {
+                        done.add(neighbor);
+                        todo.add(neighbor);
+                    }
+                }
+            }
+
+            if (toReplace.size() > 10000) {
+                return;
+            }
+        }
+
+        for (BlockPos p : toReplace) {
+            level.setBlock(p, CAVE_AIR.defaultBlockState(), 3);
+        }
+    }
+
     @Override
     public InteractionResult useOn(UseOnContext context) {
         Level level = context.getLevel();
@@ -82,9 +116,16 @@ public class GatewayItem extends Item {
                     boundingBox.maxZ() - boundingBox.minZ() + 1
             ));
             structure.saveStructure();
-            return InteractionResult.SUCCESS;
+            return InteractionResult.CONSUME;
         }
 
+        // If in offhand, fill everything beyond your level with cave air
+        if (context.getPlayer().getOffhandItem() == context.getItemInHand()) {
+            fillCaveAir(level, pos.offset(0, 1, 0));
+            return InteractionResult.CONSUME;
+        }
+
+        // Otherwise place gateways in the chosen direction
         for (int i = 0; i < 8; i++) {
             pos = pos.offset(direction.getNormal());
             BlockState state = level.getBlockState(pos);

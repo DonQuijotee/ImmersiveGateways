@@ -1,6 +1,14 @@
 {
   "values": [
-    "#immersive_gateways:cherry_grove_portal",
-    "#immersive_gateways:plains_portal"
+    "#immersive_gateways:plains",
+    "#immersive_gateways:cherry_grove",
+    "#immersive_gateways:badlands",
+    "#immersive_gateways:desert",
+    "#immersive_gateways:ice",
+    "#immersive_gateways:jungle",
+    "#immersive_gateways:mangrove_swamp",
+    "#immersive_gateways:mountain",
+    "#immersive_gateways:mushroom",
+    "#immersive_gateways:swamp"
   ]
 }

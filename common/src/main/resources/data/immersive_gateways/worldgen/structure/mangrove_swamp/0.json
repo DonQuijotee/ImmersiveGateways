@@ -1,6 +1,6 @@
 {
   "type": "jigsaw",
-  "biomes": "#immersive_gateways:has_structure/plains_portal",
+  "biomes": "#immersive_gateways:has_structure/mangrove_swamp_portal",
   "step": "surface_structures",
   "project_start_to_heightmap": "OCEAN_FLOOR",
   "terrain_adaptation": "none",
@@ -11,11 +11,9 @@
     "elements": [
       {
         "element": {
-          "element_type": "minecraft:legacy_single_pool_element",
-          "location": "immersive_gateways:plains/0",
-          "processors": {
-            "processors": []
-          },
+          "element_type": "minecraft:single_pool_element",
+          "location": "immersive_gateways:mangrove_swamp/0",
+          "processors": "immersive_gateways:default",
           "projection": "rigid"
         },
         "weight": 1
@@ -25,7 +23,8 @@
   },
   "start_height": {
     "type": "constant",
-    "absolute": -9
+    "absolute": -10
   },
   "use_expansion_hack": false
 }
+
