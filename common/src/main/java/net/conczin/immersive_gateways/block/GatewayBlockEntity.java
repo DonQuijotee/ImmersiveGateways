@@ -11,6 +11,7 @@ import net.minecraft.nbt.IntTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.effect.MobEffectInstance;
@@ -78,7 +79,7 @@ public class GatewayBlockEntity extends BlockEntity {
         return new Vector3f(offset.x() + getRandom() * OFFSET, offset.y() + getRandom() * OFFSET, offset.z() + getRandom() * OFFSET);
     }
 
-    private Vector3f [] getOffsets(Vector3f[] offset) {
+    private Vector3f[] getOffsets(Vector3f[] offset) {
         return new Vector3f[]{
                 offsetVector(offset[0]),
                 offsetVector(offset[1]),
@@ -212,13 +213,23 @@ public class GatewayBlockEntity extends BlockEntity {
 
         // Find a safe position to teleport
         BlockPos targetPos = portal.getSafePosition(level, entity);
-        BlockPos subtract = targetPos.subtract(portal.boundingBox().getCenter());
-        float targetYRot = (float) (Math.atan2(subtract.getZ(), subtract.getX()) * (180.0 / (float) Math.PI) - 90.0);
-
-        entity.teleportToWithTicket(targetPos.getX() + 0.5, targetPos.getY(), targetPos.getZ() + 0.5);
-        entity.setYHeadRot(targetYRot);
-        entity.setYBodyRot(targetYRot);
-        entity.setDeltaMovement(0.0, 0.0, 0.0);
+        double portalCenterX = (portal.boundingBox().maxX() + portal.boundingBox().minX()) / 2.0;
+        double portalCenterZ = (portal.boundingBox().maxZ() + portal.boundingBox().minZ()) / 2.0;
+        double deltaX = portalCenterX - (targetPos.getX() + 0.5);
+        double deltaZ = portalCenterZ - (targetPos.getZ() + 0.5);
+        float targetYRot = (float) (Math.toDegrees(Math.atan2(-deltaZ, deltaX)) + 360) % 360;
+        targetYRot = Math.round(targetYRot / 90) * 90;
+        double targetX = targetPos.getX() + 0.5;
+        double targetY = targetPos.getY();
+        double targetZ = targetPos.getZ() + 0.5;
+        if (entity instanceof ServerPlayer serverPlayer) {
+            serverPlayer.teleportTo(level, targetX, targetY, targetZ, targetYRot, serverPlayer.getXRot());
+            serverPlayer.setYHeadRot(targetYRot);
+            serverPlayer.yHeadRotO = targetYRot;
+        } else {
+            entity.teleportToWithTicket(targetX, targetY, targetZ);
+            entity.setYRot(targetYRot);
+        }
     }
 
     @Override
@@ -245,3 +256,4 @@ public class GatewayBlockEntity extends BlockEntity {
         return color;
     }
 }
+

@@ -227,7 +227,7 @@ public class PortalDataManager {
     }
 
     public static class PortalDataLookup extends SavedData {
-        final List<PortalPair> portals = new LinkedList<>();
+        final Set<PortalPair> portals = new HashSet<>();
         final Map<Long, Set<PortalPair>> lookup = new HashMap<>();
 
         public static PortalDataLookup load(CompoundTag nbt) {
@@ -253,6 +253,7 @@ public class PortalDataManager {
         public void add(PortalPair data) {
             portals.add(data);
             populateLookup(data);
+            setDirty();
         }
 
         private void populateLookup(PortalPair data) {
@@ -305,13 +306,13 @@ public class PortalDataManager {
         public BlockPos getSafePosition(ServerLevel level, Entity entity) {
             List<BlockPos> candidates = new LinkedList<>();
 
-            if (boundingBox.getXSpan() > 1) {
+            if (boundingBox.getZSpan() > 1) {
                 int z = (boundingBox.minZ() + boundingBox.maxZ()) / 2;
                 candidates.add(new BlockPos(boundingBox.minX() - 1, boundingBox.minY(), z));
                 candidates.add(new BlockPos(boundingBox.maxX() + 1, boundingBox.minY(), z));
             }
 
-            if (boundingBox.getZSpan() > 1) {
+            if (boundingBox.getXSpan() > 1) {
                 int x = (boundingBox.minX() + boundingBox.maxX()) / 2;
                 candidates.add(new BlockPos(x, boundingBox.minY(), boundingBox.minZ() - 1));
                 candidates.add(new BlockPos(x, boundingBox.minY(), boundingBox.maxZ() + 1));
@@ -320,7 +321,7 @@ public class PortalDataManager {
             for (int y = boundingBox.minY(); y <= level.getMaxBuildHeight(); y++) {
                 for (BlockPos candidate : candidates) {
                     BlockPos pos = new BlockPos(candidate.getX(), y, candidate.getZ());
-                    if (level.loadedAndEntityCanStandOn(pos, entity)) {
+                    if (entity.level().noCollision(entity)) {
                         return pos;
                     }
                 }

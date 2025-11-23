@@ -22,7 +22,7 @@ public class GatewayItem extends Item {
         Direction direction = context.getClickedFace();
         Direction.Axis axis = context.getPlayer() != null && direction.getAxis().isVertical() ? Direction.fromYRot(context.getPlayer().getYRot() + 90.0).getAxis() : Direction.Axis.Y;
 
-        for (int i = 0; i < 5; i++) {
+        for (int i = 0; i < 8; i++) {
             pos = pos.offset(direction.getNormal());
             BlockState state = level.getBlockState(pos);
             if (state.isAir()) {

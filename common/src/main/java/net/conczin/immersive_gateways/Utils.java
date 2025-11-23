@@ -66,7 +66,7 @@ public class Utils {
 
         public SearchResult next() {
             while (hasNext()) {
-                if (scannedChunks++ % 1000 == 0) {
+                if (++scannedChunks % 1000 == 0) {
                     Common.LOGGER.info("Scanned {} chunks", scannedChunks);
                 }
 

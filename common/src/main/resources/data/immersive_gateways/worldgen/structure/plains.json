@@ -25,7 +25,7 @@
   },
   "start_height": {
     "type": "constant",
-    "absolute": -8
+    "absolute": -9
   },
   "use_expansion_hack": false
 }
