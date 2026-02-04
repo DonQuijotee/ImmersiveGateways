@@ -118,7 +118,7 @@ public class PortalDataManager {
 
         // No portals found, give up
         if (candidate == null) {
-            Common.LOGGER.warn("No nearby portal not found, giving up...");
+            Common.LOGGER.warn("No nearby portal not found, giving up.");
             return portal.resolve();
         }
 
@@ -178,7 +178,7 @@ public class PortalDataManager {
         BlockPos improvedPos = findBlockInArea(level, pos);
 
         if (improvedPos == null) {
-            Common.LOGGER.warn("Failed to find gateway block near {}", pos);
+            Common.LOGGER.warn("Failed to find gateway block near {}.", pos);
             return BoundingBox.fromCorners(pos, pos);
         }
 
@@ -186,7 +186,7 @@ public class PortalDataManager {
         BoundingBox boundingBox = estimateBoundingBox(level, improvedPos);
 
         long delta = System.nanoTime() - time;
-        Common.LOGGER.info("Exit search took {} ms", delta / 1_000_000);
+        Common.LOGGER.info("Exit search took {} ms.", delta / 1_000_000);
 
         return boundingBox;
     }

@@ -169,16 +169,22 @@ public class GatewayBlockEntity extends BlockEntity {
         if (blockEntity.color == 0) {
             blockEntity.color = 1;
 
-            // Run future
-            PortalDataManager.PortalPair search = PortalDataManager.search(level, pos);
-            if (!search.first.resolved() || !search.second.resolved()) {
+            // Fetch color or resolve portals in a separate thread if needed
+            PortalDataManager.PortalPair pair = PortalDataManager.search(level, pos);
+            if (pair.first.resolved() && pair.second.resolved()) {
+                applyPortalColor(level, pos, blockEntity, pair);
+            } else {
                 GatewayExecutorController.submit(() -> {
-                    PortalDataManager.PortalPair pair = PortalDataManager.searchAndResolve(level, pos);
-                    blockEntity.setColor(pair.getTarget(pos).color());
-                    level.getChunkSource().blockChanged(pos);
+                    PortalDataManager.PortalPair resolvedPair = PortalDataManager.searchAndResolve(level, pos);
+                    applyPortalColor(level, pos, blockEntity, resolvedPair);
                 });
             }
         }
+    }
+
+    private static void applyPortalColor(ServerLevel level, BlockPos pos, GatewayBlockEntity blockEntity, PortalDataManager.PortalPair pair) {
+        blockEntity.setColor(pair.getTarget(pos).color());
+        level.getChunkSource().blockChanged(pos);
     }
 
     public void setColor(int color) {
