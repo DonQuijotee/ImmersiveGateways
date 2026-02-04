@@ -15,7 +15,6 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
@@ -40,7 +39,7 @@ public class PortalDataManager {
     /**
      * Searches for a portal destination at the given position, or creates a new one if none is found.
      */
-    public static PortalPair search(ServerLevel level, BlockPos pos, boolean resolve) {
+    public static synchronized PortalPair search(ServerLevel level, BlockPos pos) {
         PortalDataLookup state = getState(level);
 
         // Check if a known portal is nearby
@@ -68,8 +67,19 @@ public class PortalDataManager {
             Common.LOGGER.info("New draft portal created.");
         }
 
-        // Resolve it
-        if (resolve && !portal.second.resolved()) {
+        return portal;
+    }
+
+    public static PortalPair searchAndResolve(ServerLevel level, BlockPos pos) {
+        PortalDataLookup state = getState(level);
+        PortalPair portal = search(level, pos);
+
+        if (!portal.second.resolved()) {
+            portal.second = resolve(state, portal.second, level);
+            state.add(portal);
+        }
+
+        if (!portal.second.resolved()) {
             portal.second = resolve(state, portal.second, level);
             state.add(portal);
         }
@@ -80,7 +90,7 @@ public class PortalDataManager {
     /**
      * Looks for the exit position of the portal.
      */
-    private static synchronized Portal resolve(PortalDataLookup state, Portal portal, ServerLevel level) {
+    private static Portal resolve(PortalDataLookup state, Portal portal, ServerLevel level) {
         // Create an iterator over all nearby portal structures
         BlockPos target = portal.boundingBox().getCenter();
         Config c = Config.getInstance();
@@ -116,11 +126,7 @@ public class PortalDataManager {
         BoundingBox boundingBox = findPortalBoundingBox(level, candidate);
 
         // Return resolved portal
-        return new Portal(
-                boundingBox,
-                getColor(level, candidate),
-                true
-        );
+        return new Portal(boundingBox, getColor(level, candidate), true);
     }
 
     /**
@@ -190,27 +196,27 @@ public class PortalDataManager {
      * Tries to optimize the search.
      */
     private static BlockPos findBlockInArea(ServerLevel level, BlockPos pos) {
-        // TODO: Isn't the structure block next to it?
-        BlockPos.MutableBlockPos chunkPos = new BlockPos.MutableBlockPos();
-        int range = 2;
-        for (int cx = SectionPos.blockToSectionCoord(pos.getX()) - range; cx <= SectionPos.blockToSectionCoord(pos.getX()) + range; cx++) {
-            for (int cz = SectionPos.blockToSectionCoord(pos.getZ()) - range; cz <= SectionPos.blockToSectionCoord(pos.getZ()) + range; cz++) {
-                LevelChunk chunk = level.getChunk(cx, cz);
-                for (int cy = 0; cy < chunk.getSectionsCount(); cy++) {
-                    LevelChunkSection section = chunk.getSection(cy);
-                    if (section.hasOnlyAir()) continue;
-                    if (!section.maybeHas(s -> s.is(Blocks.GATEWAY))) continue;
-                    for (int x = 0; x < 16; x++) {
-                        for (int y = 0; y < 16; y++) {
-                            for (int z = 0; z < 16; z++) {
-                                chunkPos.set(
-                                        SectionPos.sectionToBlockCoord(cx, x),
-                                        SectionPos.sectionToBlockCoord(chunk.getSectionYFromSectionIndex(cy), y),
-                                        SectionPos.sectionToBlockCoord(cz, z)
-                                );
-                                if (chunk.getBlockState(chunkPos).is(Blocks.GATEWAY)) {
-                                    return chunkPos;
-                                }
+        BlockPos.MutableBlockPos gatewayPos = new BlockPos.MutableBlockPos();
+        int centerCx = SectionPos.blockToSectionCoord(pos.getX());
+        int centerCz = SectionPos.blockToSectionCoord(pos.getZ());
+        for (int[] coord : Utils.chunkCoordsInRadiusSorted(centerCx, centerCz, 3)) {
+            int cx = coord[0];
+            int cz = coord[1];
+            LevelChunk chunk = level.getChunk(cx, cz);
+            for (int cy = 0; cy < chunk.getSectionsCount(); cy++) {
+                LevelChunkSection section = chunk.getSection(cy);
+                if (section.hasOnlyAir()) continue;
+                if (!section.maybeHas(s -> s.is(Blocks.GATEWAY))) continue;
+                for (int x = 0; x < 16; x++) {
+                    for (int y = 0; y < 16; y++) {
+                        for (int z = 0; z < 16; z++) {
+                            gatewayPos.set(
+                                    SectionPos.sectionToBlockCoord(cx, x),
+                                    SectionPos.sectionToBlockCoord(chunk.getSectionYFromSectionIndex(cy), y),
+                                    SectionPos.sectionToBlockCoord(cz, z)
+                            );
+                            if (chunk.getBlockState(gatewayPos).is(Blocks.GATEWAY)) {
+                                return gatewayPos;
                             }
                         }
                     }
@@ -223,6 +229,9 @@ public class PortalDataManager {
     private static int getColor(ServerLevel level, BlockPos pos) {
         Holder<Biome> biome = level.getBiome(pos);
         ResourceLocation resourceLocation = biome.unwrapKey().map(ResourceKey::location).orElse(new ResourceLocation("minecraft:plains"));
+        if (!Config.getInstance().colors.containsKey(resourceLocation.toString())) {
+            Common.LOGGER.info("Biome {} not found in color config, using default foliage color.", resourceLocation);
+        }
         return Config.getInstance().colors.getOrDefault(resourceLocation.toString(), biome.value().getFoliageColor());
     }
 
@@ -250,7 +259,7 @@ public class PortalDataManager {
             return nbt;
         }
 
-        public void add(PortalPair data) {
+        public synchronized void add(PortalPair data) {
             portals.add(data);
             populateLookup(data);
             setDirty();
@@ -303,7 +312,7 @@ public class PortalDataManager {
             return new Portal(boundingBox, color, true);
         }
 
-        public BlockPos getSafePosition(ServerLevel level, Entity entity) {
+        public BlockPos getSafePosition(ServerLevel level) {
             List<BlockPos> candidates = new LinkedList<>();
 
             if (boundingBox.getZSpan() > 1) {
@@ -321,7 +330,7 @@ public class PortalDataManager {
             for (int y = boundingBox.minY(); y <= level.getMaxBuildHeight(); y++) {
                 for (BlockPos candidate : candidates) {
                     BlockPos pos = new BlockPos(candidate.getX(), y, candidate.getZ());
-                    if (entity.level().noCollision(entity)) {
+                    if (level.getBlockState(pos).isAir() && level.getBlockState(pos.offset(0, 1, 0)).isAir()) {
                         return pos;
                     }
                 }
@@ -332,8 +341,7 @@ public class PortalDataManager {
     }
 
     public static final class PortalPair {
-        public static final Codec<PortalPair> CODEC = RecordCodecBuilder.create((pair)
-                -> pair.group(
+        public static final Codec<PortalPair> CODEC = RecordCodecBuilder.create((pair) -> pair.group(
                 Portal.CODEC.fieldOf("first").forGetter(PortalPair::first),
                 Portal.CODEC.fieldOf("second").forGetter(PortalPair::second)
         ).apply(pair, PortalPair::new));

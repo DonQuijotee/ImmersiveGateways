@@ -31,8 +31,6 @@ import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
 
 public class GatewayBlockEntity extends BlockEntity {
     public static final double DISTANCE = 16.0;
@@ -166,19 +164,20 @@ public class GatewayBlockEntity extends BlockEntity {
         }
     }
 
-    static Executor executor = Executors.newSingleThreadExecutor();
-
     public static void serverTick(ServerLevel level, BlockPos pos, @SuppressWarnings("unused") BlockState state, GatewayBlockEntity blockEntity) {
         // If the color is not set yet, lazily search for the second portal
         if (blockEntity.color == 0) {
             blockEntity.color = 1;
 
             // Run future
-            executor.execute(() -> {
-                PortalDataManager.PortalPair pair = PortalDataManager.search(level, pos, true);
-                blockEntity.setColor(pair.getTarget(pos).color());
-                level.getChunkSource().blockChanged(pos);
-            });
+            PortalDataManager.PortalPair search = PortalDataManager.search(level, pos);
+            if (!search.first.resolved() || !search.second.resolved()) {
+                GatewayExecutorController.submit(() -> {
+                    PortalDataManager.PortalPair pair = PortalDataManager.searchAndResolve(level, pos);
+                    blockEntity.setColor(pair.getTarget(pos).color());
+                    level.getChunkSource().blockChanged(pos);
+                });
+            }
         }
     }
 
@@ -198,7 +197,7 @@ public class GatewayBlockEntity extends BlockEntity {
         entity.setPortalCooldown();
 
         // Find exist
-        PortalDataManager.PortalPair pair = PortalDataManager.search(level, pos, false);
+        PortalDataManager.PortalPair pair = PortalDataManager.search(level, pos);
         PortalDataManager.Portal portal = pair.getTarget(pos);
 
         if (!portal.resolved()) {
@@ -212,7 +211,7 @@ public class GatewayBlockEntity extends BlockEntity {
         }
 
         // Find a safe position to teleport
-        BlockPos targetPos = portal.getSafePosition(level, entity);
+        BlockPos targetPos = portal.getSafePosition(level);
         double portalCenterX = (portal.boundingBox().maxX() + portal.boundingBox().minX()) / 2.0;
         double portalCenterZ = (portal.boundingBox().maxZ() + portal.boundingBox().minZ()) / 2.0;
         double deltaX = portalCenterX - (targetPos.getX() + 0.5);
@@ -256,4 +255,3 @@ public class GatewayBlockEntity extends BlockEntity {
         return color;
     }
 }
-

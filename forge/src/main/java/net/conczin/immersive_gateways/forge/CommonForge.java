@@ -1,10 +1,13 @@
 package net.conczin.immersive_gateways.forge;
 
 import net.conczin.immersive_gateways.*;
+import net.conczin.immersive_gateways.block.GatewayExecutorController;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraftforge.event.server.ServerAboutToStartEvent;
+import net.minecraftforge.event.server.ServerStoppingEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.registries.RegisterEvent;
@@ -22,6 +25,16 @@ public class CommonForge {
 
     public CommonForge() {
         Common.init();
+    }
+
+    @SubscribeEvent
+    public static void handleServerAboutToStart(ServerAboutToStartEvent event) {
+        GatewayExecutorController.reset();
+    }
+
+    @SubscribeEvent
+    public static void handleServerStopping(ServerStoppingEvent event) {
+        GatewayExecutorController.shutdown();
     }
 
     @SubscribeEvent

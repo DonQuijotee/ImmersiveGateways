@@ -129,4 +129,20 @@ public class Utils {
 
         return term1.add(term2).add(term3);
     }
+
+
+    public static List<int[]> chunkCoordsInRadiusSorted(int centerCx, int centerCz, int radius) {
+        List<int[]> coords = new ArrayList<>();
+        for (int x = centerCx - radius; x <= centerCx + radius; x++) {
+            for (int z = centerCz - radius; z <= centerCz + radius; z++) {
+                coords.add(new int[]{x, z});
+            }
+        }
+        coords.sort(Comparator.comparingLong(a -> {
+            long dx = a[0] - centerCx;
+            long dz = a[1] - centerCz;
+            return dx * dx + dz * dz;
+        }));
+        return coords;
+    }
 }

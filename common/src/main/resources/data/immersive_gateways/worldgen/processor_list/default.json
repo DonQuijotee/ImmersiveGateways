@@ -14,8 +14,8 @@
           "predicate_type": "minecraft:linear_pos",
           "min_chance": 1.0,
           "max_chance": 0.0,
-          "min_dist": 4,
-          "max_dist": 8
+          "min_dist": 5,
+          "max_dist": 9
         },
         "output_state": {
           "Name": "minecraft:cave_air"

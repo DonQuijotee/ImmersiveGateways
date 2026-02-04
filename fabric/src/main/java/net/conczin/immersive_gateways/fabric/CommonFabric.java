@@ -1,7 +1,9 @@
 package net.conczin.immersive_gateways.fabric;
 
 import net.conczin.immersive_gateways.*;
+import net.conczin.immersive_gateways.block.GatewayExecutorController;
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.level.block.entity.BlockEntityType;
@@ -16,6 +18,8 @@ public class CommonFabric implements ModInitializer {
     @Override
     public void onInitialize() {
         Common.init();
+        ServerLifecycleEvents.SERVER_STARTING.register(server -> GatewayExecutorController.reset());
+        ServerLifecycleEvents.SERVER_STOPPED.register(server -> GatewayExecutorController.shutdown());
 
         registerHelper(BuiltInRegistries.ITEM, Items::registerItems);
         registerHelper(BuiltInRegistries.BLOCK, Blocks::registerBlocks);
