@@ -8,7 +8,5 @@
     "defaultRequire": 1
   },
   "mixins": ["ChunkGeneratorInvoker"],
-  "client": [
-    "client.LevelRendererMixin"
-  ]
+  "client": ["client.LevelRendererMixin"]
 }

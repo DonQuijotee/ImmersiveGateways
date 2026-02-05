@@ -51,7 +51,5 @@ dependencies {
 
 jar {
     finalizedBy('reobfJar')
-    manifest.attributes([
-            "MixinConfigs": "${mod_id}.mixins.json,${mod_id}.forge.mixins.json"
-    ])
+    manifest.attributes(["MixinConfigs": "${mod_id}.mixins.json"])
 }
