@@ -5,6 +5,7 @@ import net.conczin.immersive_gateways.block.GatewayBlock;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Vec3i;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.context.UseOnContext;
@@ -121,7 +122,10 @@ public class GatewayItem extends Item {
 
         // If in offhand, fill everything beyond your level with cave air
         if (context.getPlayer().getOffhandItem() == context.getItemInHand()) {
-            fillCaveAir(level, pos.offset(0, 1, 0));
+            if (!context.getLevel().isClientSide) {
+                fillCaveAir(level, pos.offset(0, 1, 0));
+                context.getPlayer().sendSystemMessage(Component.literal("Filled everything below with cave air!"));
+            }
             return InteractionResult.CONSUME;
         }
 

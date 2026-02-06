@@ -195,11 +195,11 @@ public class GatewayBlockEntity extends BlockEntity {
     private static void playSound(Level level, BlockPos pos, SoundEvent sound) {
         float volume = level.random.nextFloat() * 0.1f + 0.1f;
         float pitch = level.random.nextFloat() * 0.4f + 0.8f;
-        level.playLocalSound(pos.getX(), pos.getY(), pos.getZ(), sound, SoundSource.BLOCKS, volume, pitch, false);
+        level.playSound(null, pos, sound, SoundSource.BLOCKS, volume, pitch);
     }
 
     public static void teleportEntity(ServerLevel level, BlockPos pos, Entity entity) {
-        entity.playSound(Sounds.GATEWAY, 1.0f, 1.0f);
+        playSound(level, pos, Sounds.GATEWAY);
         entity.setPortalCooldown();
 
         // Find exist

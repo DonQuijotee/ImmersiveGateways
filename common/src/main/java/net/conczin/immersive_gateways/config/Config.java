@@ -20,8 +20,8 @@ public final class Config extends JsonConfig {
         return 0;
     }
 
-    public int minDistance = 512;
-    public int maxDistance = 16384;
+    public int minDistance = 1024;
+    public int maxDistance = 8096;
     public int maxScanDistanceInChunks = 256;
     public boolean onlyPlayersCanTeleport = true;
 
