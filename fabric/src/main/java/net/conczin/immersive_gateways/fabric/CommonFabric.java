@@ -17,7 +17,6 @@ public class CommonFabric implements ModInitializer {
 
     @Override
     public void onInitialize() {
-        Common.init();
         ServerLifecycleEvents.SERVER_STARTING.register(server -> GatewayExecutorController.reset());
         ServerLifecycleEvents.SERVER_STOPPED.register(server -> GatewayExecutorController.shutdown());
 

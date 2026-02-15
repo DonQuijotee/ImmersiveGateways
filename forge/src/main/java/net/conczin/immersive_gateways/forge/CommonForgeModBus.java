@@ -20,10 +20,6 @@ public class CommonForgeModBus {
         );
     }
 
-    public CommonForgeModBus() {
-        Common.init();
-    }
-
     @SubscribeEvent
     public static void register(RegisterEvent event) {
         registerHelper(event, BuiltInRegistries.ITEM, Items::registerItems);

@@ -8,17 +8,25 @@ import net.conczin.immersive_gateways.Utils;
 import net.conczin.immersive_gateways.config.Config;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
+import net.minecraft.core.Registry;
 import net.minecraft.core.SectionPos;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
+import net.minecraft.world.level.levelgen.structure.Structure;
+import net.minecraft.world.level.levelgen.structure.StructureStart;
 import net.minecraft.world.level.saveddata.SavedData;
 
 import java.util.*;
@@ -28,6 +36,9 @@ import java.util.*;
  * A portal is a pair of portals, each defined as a bounding box.
  */
 public class PortalDataManager {
+    private static final long MAX_INHABITED_TIME = 20L * 60L;
+    private static final long SEARCH_ATTEMPTS = 10;
+
     public static long toLong(int x, int z) {
         return ((long) x << 32) | (z & 0xFFFFFFFFL);
     }
@@ -39,94 +50,129 @@ public class PortalDataManager {
     /**
      * Searches for a portal destination at the given position, or creates a new one if none is found.
      */
-    public static synchronized PortalPair search(ServerLevel level, BlockPos pos) {
+    public static PortalPair search(ServerLevel level, BlockPos pos, boolean generate) {
         PortalDataLookup state = getState(level);
 
         // Check if a known portal is nearby
         PortalPair portal = state.search(pos);
 
         // Create a new draft portal if none is found
-        if (portal == null) {
-            // Pick a random position
-            Config c = Config.getInstance();
-            float distance = level.random.nextFloat() * (c.maxDistance - c.minDistance) + c.minDistance;
-            double angle = level.random.nextFloat() * Math.PI;
+        if (portal == null && generate) {
+            long t = System.currentTimeMillis();
 
-            BlockPos target = new BlockPos(
-                    (int) (pos.getX() + Math.cos(angle) * distance),
-                    pos.getY(),
-                    (int) (pos.getZ() + Math.sin(angle) * distance)
-            );
+            // Pick a random position
+            BlockPos target = null;
+            int attempt = 0;
+            for (; attempt < SEARCH_ATTEMPTS; attempt++) {
+                Config c = Config.getInstance();
+                float distance = level.random.nextFloat() * (c.maxDistance - c.minDistance) + c.minDistance;
+                double angle = level.random.nextFloat() * Math.PI;
+
+                // Approximate Target position
+                target = new BlockPos(
+                        (int) (pos.getX() + Math.cos(angle) * distance),
+                        pos.getY(),
+                        (int) (pos.getZ() + Math.sin(angle) * distance)
+                );
+
+                // Real resolved position
+                BlockPos realTarget = placeStructure(level, target, attempt > SEARCH_ATTEMPTS / 2, attempt != SEARCH_ATTEMPTS - 1);
+                if (realTarget != null) {
+                    target = realTarget;
+                    break;
+                }
+            }
 
             // Add portal and initialize search
             portal = new PortalPair(
-                    new Portal(findPortalBoundingBox(level, pos), getColor(level, pos), true),
-                    new Portal(BoundingBox.fromCorners(target, target), -1, false)
+                    new Portal(estimateBoundingBox(level, pos), getColor(level, pos)),
+                    new Portal(estimateBoundingBox(level, target), getColor(level, pos))
             );
             state.add(portal);
-            Common.LOGGER.info("New draft portal created.");
+
+            // Logging
+            long delta = System.currentTimeMillis() - t;
+            Common.LOGGER.info("Portal created in {} ms using {} attempts", delta, attempt);
         }
 
         return portal;
     }
 
-    public static PortalPair searchAndResolve(ServerLevel level, BlockPos pos) {
-        PortalDataLookup state = getState(level);
-        PortalPair portal = search(level, pos);
-
-        if (!portal.second.resolved()) {
-            portal.second = resolve(state, portal.second, level);
-            state.add(portal);
+    public static BlockPos placeStructure(ServerLevel level, BlockPos pos, boolean useFallback, boolean checkInhabitedTime) {
+        Registry<Structure> registry = level.registryAccess().registry(Registries.STRUCTURE).orElse(null);
+        if (registry == null) {
+            return null;
         }
 
-        if (!portal.second.resolved()) {
-            portal.second = resolve(state, portal.second, level);
-            state.add(portal);
+        // Prevent nuking player builds
+        ChunkAccess chunk = level.getChunk(pos);
+        if (checkInhabitedTime && chunk.getInhabitedTime() > MAX_INHABITED_TIME) {
+            return null;
         }
 
-        return portal;
-    }
+        // List all valid structures for target biomes
+        Holder<Biome> biome = level.getBiome(pos);
+        List<Structure> structures = registry
+                .stream().filter(s -> {
+                    ResourceLocation key = registry.getKey(s);
+                    return s.biomes().contains(biome) && key != null && key.getNamespace().equals("immersive_gateways");
+                }).toList();
 
-    /**
-     * Looks for the exit position of the portal.
-     */
-    private static Portal resolve(PortalDataLookup state, Portal portal, ServerLevel level) {
-        // Create an iterator over all nearby portal structures
-        BlockPos target = portal.boundingBox().getCenter();
-        Config c = Config.getInstance();
-        Utils.NearestMapStructureIterator structures = Utils.getStructureSet(level, Common.locate("portal"))
-                .map(s -> new Utils.NearestMapStructureIterator(level, s, target, 0, c.maxScanDistanceInChunks, false))
-                .orElse(null);
+        // If not structure works for this biome, use default
+        if (structures.isEmpty() && useFallback) {
+            // TODO: Try n times to find a proper biomes, and then fall back
+            TagKey<Structure> structureTagKey = TagKey.create(Registries.STRUCTURE, Common.locate("plains"));
+            structures = registry.getTag(structureTagKey)
+                    .map(t -> t.stream().map(Holder::value).toList())
+                    .orElse(List.of());
 
-        // In modded scenarios, the structures could be missing
-        if (structures == null) {
-            Common.LOGGER.warn("No portal structures found.");
-            return portal.resolve();
+            ResourceLocation biomeName = biome.unwrapKey().map(ResourceKey::location).orElse(new ResourceLocation("minecraft:unknown"));
+            Common.LOGGER.info("No structure found for biome {}, using default plains structures.", biomeName);
         }
 
-        // Iterate over all structures, skip connected ones
-        BlockPos candidate = null;
-        while (structures.hasNext()) {
-            Utils.SearchResult result = structures.next();
-
-            // Skip if the portal is already connected
-            if (state.search(result.pos()) == null) {
-                candidate = result.pos();
-                break;
-            }
+        if (structures.isEmpty()) {
+            return null;
         }
 
-        // No portals found, give up
-        if (candidate == null) {
-            Common.LOGGER.warn("No nearby portal not found, giving up.");
-            return portal.resolve();
+        // Find the start position
+        Structure structure = structures.get(level.getRandom().nextInt(structures.size()));
+        ChunkGenerator chunkgenerator = level.getChunkSource().getGenerator();
+        StructureStart structureStart = structure.generate(
+                level.registryAccess(),
+                chunkgenerator,
+                chunkgenerator.getBiomeSource(),
+                level.getChunkSource().randomState(),
+                level.getStructureManager(),
+                level.getSeed(),
+                new ChunkPos(pos),
+                0,
+                level,
+                (holder) -> true
+        );
+
+        // Generate
+        if (structureStart.isValid()) {
+            BoundingBox boundingbox = structureStart.getBoundingBox();
+            Utils.getChunksInBoundingBox(boundingbox).forEach((chunkPos) ->
+                    structureStart.placeInChunk(
+                            level,
+                            level.structureManager(),
+                            chunkgenerator,
+                            level.getRandom(),
+                            new BoundingBox(
+                                    chunkPos.getMinBlockX(),
+                                    level.getMinBuildHeight(),
+                                    chunkPos.getMinBlockZ(),
+                                    chunkPos.getMaxBlockX(),
+                                    level.getMaxBuildHeight(),
+                                    chunkPos.getMaxBlockZ()
+                            ),
+                            chunkPos
+                    )
+            );
+            return findBlockInArea(level, boundingbox);
         }
-
-        // Find the exact portal dimensions
-        BoundingBox boundingBox = findPortalBoundingBox(level, candidate);
-
-        // Return resolved portal
-        return new Portal(boundingBox, getColor(level, candidate), true);
+        return null;
     }
 
     /**
@@ -171,38 +217,13 @@ public class PortalDataManager {
     }
 
     /**
-     * Finds the exact portal bounding box.
-     */
-    private static BoundingBox findPortalBoundingBox(ServerLevel level, BlockPos pos) {
-        long time = System.nanoTime();
-        BlockPos improvedPos = findBlockInArea(level, pos);
-
-        if (improvedPos == null) {
-            Common.LOGGER.warn("Failed to find gateway block near {}.", pos);
-            return BoundingBox.fromCorners(pos, pos);
-        }
-
-        // Found a portal, now estimate the size of the portal
-        BoundingBox boundingBox = estimateBoundingBox(level, improvedPos);
-
-        long delta = System.nanoTime() - time;
-        Common.LOGGER.info("Exit search took {} ms.", delta / 1_000_000);
-
-        return boundingBox;
-    }
-
-    /**
      * Finds a gateway block in the area around the given position.
      * Tries to optimize the search.
      */
-    private static BlockPos findBlockInArea(ServerLevel level, BlockPos pos) {
+    private static BlockPos findBlockInArea(ServerLevel level, BoundingBox box) {
         BlockPos.MutableBlockPos gatewayPos = new BlockPos.MutableBlockPos();
-        int centerCx = SectionPos.blockToSectionCoord(pos.getX());
-        int centerCz = SectionPos.blockToSectionCoord(pos.getZ());
-        for (int[] coord : Utils.chunkCoordsInRadiusSorted(centerCx, centerCz, 3)) {
-            int cx = coord[0];
-            int cz = coord[1];
-            LevelChunk chunk = level.getChunk(cx, cz);
+        for (ChunkPos chunkPos : Utils.getChunksInBoundingBox(box).toList()) {
+            LevelChunk chunk = level.getChunk(chunkPos.x, chunkPos.z);
             for (int cy = 0; cy < chunk.getSectionsCount(); cy++) {
                 LevelChunkSection section = chunk.getSection(cy);
                 if (section.hasOnlyAir()) continue;
@@ -211,9 +232,9 @@ public class PortalDataManager {
                     for (int y = 0; y < 16; y++) {
                         for (int z = 0; z < 16; z++) {
                             gatewayPos.set(
-                                    SectionPos.sectionToBlockCoord(cx, x),
+                                    SectionPos.sectionToBlockCoord(chunkPos.x, x),
                                     SectionPos.sectionToBlockCoord(chunk.getSectionYFromSectionIndex(cy), y),
-                                    SectionPos.sectionToBlockCoord(cz, z)
+                                    SectionPos.sectionToBlockCoord(chunkPos.x, z)
                             );
                             if (chunk.getBlockState(gatewayPos).is(Blocks.GATEWAY)) {
                                 return gatewayPos;
@@ -300,17 +321,12 @@ public class PortalDataManager {
         }
     }
 
-    public record Portal(BoundingBox boundingBox, int color, boolean resolved) {
+    public record Portal(BoundingBox boundingBox, int color) {
         public static final Codec<Portal> CODEC = RecordCodecBuilder.create((portal)
                 -> portal.group(
                 BoundingBox.CODEC.fieldOf("boundingBox").forGetter(Portal::boundingBox),
-                Codec.INT.fieldOf("color").forGetter(Portal::color),
-                Codec.BOOL.fieldOf("resolved").forGetter(Portal::resolved)
+                Codec.INT.fieldOf("color").forGetter(Portal::color)
         ).apply(portal, Portal::new));
-
-        public Portal resolve() {
-            return new Portal(boundingBox, color, true);
-        }
 
         public BlockPos getSafePosition(ServerLevel level) {
             List<BlockPos> candidates = new LinkedList<>();
@@ -340,19 +356,11 @@ public class PortalDataManager {
         }
     }
 
-    public static final class PortalPair {
+    public record PortalPair(Portal first, Portal second) {
         public static final Codec<PortalPair> CODEC = RecordCodecBuilder.create((pair) -> pair.group(
                 Portal.CODEC.fieldOf("first").forGetter(PortalPair::first),
                 Portal.CODEC.fieldOf("second").forGetter(PortalPair::second)
         ).apply(pair, PortalPair::new));
-
-        public Portal first;
-        public Portal second;
-
-        public PortalPair(Portal first, Portal second) {
-            this.first = first;
-            this.second = second;
-        }
 
         public static PortalPair load(Tag nbt) {
             return CODEC.parse(NbtOps.INSTANCE, nbt).resultOrPartial(Common.LOGGER::error).orElseThrow();
@@ -360,14 +368,6 @@ public class PortalDataManager {
 
         public Tag save() {
             return CODEC.encodeStart(NbtOps.INSTANCE, this).resultOrPartial(Common.LOGGER::error).orElseThrow();
-        }
-
-        public Portal first() {
-            return first;
-        }
-
-        public Portal second() {
-            return second;
         }
 
         public Portal getTarget(BlockPos pos) {

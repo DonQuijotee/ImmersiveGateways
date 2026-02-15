@@ -10,10 +10,6 @@ import net.minecraftforge.fml.common.Mod;
 @Mod(Common.MOD_ID)
 @Mod.EventBusSubscriber(modid = Common.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class CommonForge {
-    public CommonForge() {
-        Common.init();
-    }
-
     @SubscribeEvent
     public static void handleServerAboutToStart(ServerAboutToStartEvent event) {
         GatewayExecutorController.reset();

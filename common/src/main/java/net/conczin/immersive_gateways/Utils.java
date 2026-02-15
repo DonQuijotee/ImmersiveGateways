@@ -1,125 +1,13 @@
 package net.conczin.immersive_gateways;
 
-import com.mojang.datafixers.util.Pair;
-import it.unimi.dsi.fastutil.objects.Object2ObjectArrayMap;
-import it.unimi.dsi.fastutil.objects.ObjectArraySet;
-import net.conczin.immersive_gateways.mixin.ChunkGeneratorInvoker;
-import net.minecraft.core.*;
-import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.tags.TagKey;
+import net.minecraft.core.SectionPos;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.StructureManager;
-import net.minecraft.world.level.chunk.ChunkGeneratorStructureState;
-import net.minecraft.world.level.levelgen.structure.Structure;
-import net.minecraft.world.level.levelgen.structure.placement.RandomSpreadStructurePlacement;
-import net.minecraft.world.level.levelgen.structure.placement.StructurePlacement;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import org.joml.Vector3f;
 
-import java.util.*;
+import java.util.stream.Stream;
 
 public class Utils {
-    public record SearchResult(BlockPos pos, Holder<Structure> structure) {
-    }
-
-    public static Optional<HolderSet.Named<Structure>> getStructureSet(ServerLevel level, ResourceLocation structures) {
-        Registry<Structure> registry = level.registryAccess().registryOrThrow(Registries.STRUCTURE);
-        return registry.getTag(TagKey.create(Registries.STRUCTURE, structures));
-    }
-
-    public static class NearestMapStructureIterator {
-        private final ServerLevel level;
-        private final boolean skipKnownStructures;
-        private final Map<RandomSpreadStructurePlacement, Set<Holder<Structure>>> placements;
-        private final Iterator<ChunkPos> chunkPosIterator;
-        private int scannedChunks = 0;
-
-        public NearestMapStructureIterator(ServerLevel level, HolderSet<Structure> structure, BlockPos pos, int minSize, int maxSize, boolean skipKnownStructures) {
-            this.level = level;
-            this.skipKnownStructures = skipKnownStructures;
-
-            // Find all placements for the structure
-            ChunkGeneratorStructureState generatorState = level.getChunkSource().getGeneratorState();
-            this.placements = new Object2ObjectArrayMap<>();
-            for (Holder<Structure> holder : structure) {
-                for (StructurePlacement placement : generatorState.getPlacementsForStructure(holder)) {
-                    if (placement instanceof RandomSpreadStructurePlacement randomSpreadStructurePlacement) {
-                        this.placements.computeIfAbsent(randomSpreadStructurePlacement, p -> new ObjectArraySet<>()).add(holder);
-                    }
-                }
-            }
-
-            // Create a chunk position iterator
-            if (this.placements.isEmpty()) {
-                this.chunkPosIterator = Collections.emptyIterator();
-            } else {
-                int x = SectionPos.blockToSectionCoord(pos.getX());
-                int y = SectionPos.blockToSectionCoord(pos.getZ());
-                this.chunkPosIterator = generateOutwardPositions(x, y, minSize, maxSize).iterator();
-            }
-        }
-
-        public boolean hasNext() {
-            return chunkPosIterator.hasNext();
-        }
-
-        public SearchResult next() {
-            while (hasNext()) {
-                if (++scannedChunks % 1000 == 0) {
-                    Common.LOGGER.info("Scanned {} chunks", scannedChunks);
-                }
-
-                ChunkPos position = chunkPosIterator.next();
-                StructureManager structureManager = level.structureManager();
-                for (Map.Entry<RandomSpreadStructurePlacement, Set<Holder<Structure>>> entry : placements.entrySet()) {
-                    Pair<BlockPos, Holder<Structure>> pair = ChunkGeneratorInvoker.invokeGetStructureGeneratingAt(entry.getValue(), level, structureManager, skipKnownStructures, entry.getKey(), position);
-                    if (pair != null) {
-                        return new SearchResult(pair.getFirst(), pair.getSecond());
-                    }
-                }
-            }
-            throw new NoSuchElementException("No more structures found");
-        }
-    }
-
-    private static Iterable<ChunkPos> generateOutwardPositions(int centerX, int centerY, int minSize, int maxSize) {
-        return () -> new Iterator<>() {
-            private int x = minSize;
-            private int y = -minSize;
-            private int dx = 0;
-            private int dy = -1;
-            private int layer = 0;
-            private int steps = 0;
-
-            @Override
-            public boolean hasNext() {
-                return Math.abs(x) <= maxSize && Math.abs(y) <= maxSize;
-            }
-
-            @Override
-            public ChunkPos next() {
-                if (!hasNext()) throw new NoSuchElementException();
-
-                ChunkPos position = new ChunkPos(x + centerX, y + centerY);
-
-                if (steps++ == layer) {
-                    steps = 0;
-                    layer++;
-
-                    int temp = dx;
-                    dx = -dy;
-                    dy = temp;
-                }
-
-                x += dx;
-                y += dy;
-
-                return position;
-            }
-        };
-    }
-
     public static Vector3f calculateQuadraticBezier(Vector3f p0, Vector3f p1, Vector3f p2, float f) {
         float f2 = 1.0f - f;
 
@@ -130,19 +18,9 @@ public class Utils {
         return term1.add(term2).add(term3);
     }
 
-
-    public static List<int[]> chunkCoordsInRadiusSorted(int centerCx, int centerCz, int radius) {
-        List<int[]> coords = new ArrayList<>();
-        for (int x = centerCx - radius; x <= centerCx + radius; x++) {
-            for (int z = centerCz - radius; z <= centerCz + radius; z++) {
-                coords.add(new int[]{x, z});
-            }
-        }
-        coords.sort(Comparator.comparingLong(a -> {
-            long dx = a[0] - centerCx;
-            long dz = a[1] - centerCz;
-            return dx * dx + dz * dz;
-        }));
-        return coords;
+    public static Stream<ChunkPos> getChunksInBoundingBox(BoundingBox box) {
+        ChunkPos fromPos = new ChunkPos(SectionPos.blockToSectionCoord(box.minX()), SectionPos.blockToSectionCoord(box.minZ()));
+        ChunkPos toPos = new ChunkPos(SectionPos.blockToSectionCoord(box.maxX()), SectionPos.blockToSectionCoord(box.maxZ()));
+        return ChunkPos.rangeClosed(fromPos, toPos);
     }
 }

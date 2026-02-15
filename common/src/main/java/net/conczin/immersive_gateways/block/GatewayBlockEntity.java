@@ -37,23 +37,23 @@ public class GatewayBlockEntity extends BlockEntity {
     public static final int COOLDOWN = 30;
     public static final float OFFSET = 2.5f;
 
-    public static Vector2f[] offsets = new Vector2f[]{
+    public static final Vector2f[] offsets = new Vector2f[]{
             new Vector2f(0.25f, 0.25f),
             new Vector2f(0.75f, 0.25f),
             new Vector2f(0.75f, 0.75f),
             new Vector2f(0.25f, 0.75f)
     };
 
-    Vector3f[] offsets1;
-    Vector3f[] offsets2;
+    final Vector3f[] offsets1;
+    final Vector3f[] offsets2;
 
-    Quaternionf[] rotations;
+    final Quaternionf[] rotations;
 
-    float[] lastTime = new float[]{0.0f, 0.0f, 0.0f, 0.0f};
-    float[] time = new float[]{0.0f, 0.0f, 0.0f, 0.0f};
-    boolean[] state = new boolean[]{false, false, false, false};
+    final float[] lastTime = new float[]{0.0f, 0.0f, 0.0f, 0.0f};
+    final float[] time = new float[]{0.0f, 0.0f, 0.0f, 0.0f};
+    final boolean[] state = new boolean[]{false, false, false, false};
 
-    Random random = new Random();
+    final Random random = new Random();
 
     int color = 0;
 
@@ -169,16 +169,11 @@ public class GatewayBlockEntity extends BlockEntity {
         if (blockEntity.color == 0) {
             blockEntity.color = 1;
 
-            // Fetch color or resolve portals in a separate thread if needed
-            PortalDataManager.PortalPair pair = PortalDataManager.search(level, pos);
-            if (pair.first.resolved() && pair.second.resolved()) {
+            // Fetch color and generate portal if it does not exist
+            GatewayExecutorController.submit(() -> {
+                PortalDataManager.PortalPair pair = PortalDataManager.search(level, pos, true);
                 applyPortalColor(level, pos, blockEntity, pair);
-            } else {
-                GatewayExecutorController.submit(() -> {
-                    PortalDataManager.PortalPair resolvedPair = PortalDataManager.searchAndResolve(level, pos);
-                    applyPortalColor(level, pos, blockEntity, resolvedPair);
-                });
-            }
+            });
         }
     }
 
@@ -199,14 +194,11 @@ public class GatewayBlockEntity extends BlockEntity {
     }
 
     public static void teleportEntity(ServerLevel level, BlockPos pos, Entity entity) {
-        playSound(level, pos, Sounds.GATEWAY);
         entity.setPortalCooldown();
 
         // Find exist
-        PortalDataManager.PortalPair pair = PortalDataManager.search(level, pos);
-        PortalDataManager.Portal portal = pair.getTarget(pos);
-
-        if (!portal.resolved()) {
+        PortalDataManager.PortalPair pair = PortalDataManager.search(level, pos, false);
+        if (pair == null) {
             entity.sendSystemMessage(Component.translatable("immersive_gateways.not_loaded_yet"));
             return;
         }
@@ -216,7 +208,12 @@ public class GatewayBlockEntity extends BlockEntity {
             livingEntity.addEffect(new MobEffectInstance(MobEffects.BLINDNESS, 50, 0));
         }
 
+        // Sound
+        playSound(level, pair.first().boundingBox().getCenter(), Sounds.GATEWAY);
+        playSound(level, pair.second().boundingBox().getCenter(), Sounds.GATEWAY);
+
         // Find a safe position to teleport
+        PortalDataManager.Portal portal = pair.getTarget(pos);
         BlockPos targetPos = portal.getSafePosition(level);
         double portalCenterX = (portal.boundingBox().maxX() + portal.boundingBox().minX()) / 2.0;
         double portalCenterZ = (portal.boundingBox().maxZ() + portal.boundingBox().minZ()) / 2.0;
