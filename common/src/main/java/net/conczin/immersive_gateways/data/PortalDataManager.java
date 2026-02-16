@@ -38,6 +38,7 @@ import java.util.*;
 public class PortalDataManager {
     private static final long MAX_INHABITED_TIME = 20L * 60L;
     private static final long SEARCH_ATTEMPTS = 10;
+    private static final int TOO_CLOSE_CHUNKS = 2;
 
     public static long toLong(int x, int z) {
         return ((long) x << 32) | (z & 0xFFFFFFFFL);
@@ -108,6 +109,17 @@ public class PortalDataManager {
         ChunkAccess chunk = level.getChunk(pos);
         if (checkInhabitedTime && chunk.getInhabitedTime() > MAX_INHABITED_TIME) {
             return null;
+        }
+
+        // Prevent generating in already linked areas
+        PortalDataLookup state = getState(level);
+        for (int x = -TOO_CLOSE_CHUNKS; x <= TOO_CLOSE_CHUNKS; x++) {
+            for (int z = -TOO_CLOSE_CHUNKS; z <= TOO_CLOSE_CHUNKS; z++) {
+                PortalPair pair = state.search(pos.offset(x * 16, 0, z * 16));
+                if (pair != null) {
+                    return null;
+                }
+            }
         }
 
         // List all valid structures for target biomes
@@ -234,7 +246,7 @@ public class PortalDataManager {
                             gatewayPos.set(
                                     SectionPos.sectionToBlockCoord(chunkPos.x, x),
                                     SectionPos.sectionToBlockCoord(chunk.getSectionYFromSectionIndex(cy), y),
-                                    SectionPos.sectionToBlockCoord(chunkPos.x, z)
+                                    SectionPos.sectionToBlockCoord(chunkPos.z, z)
                             );
                             if (chunk.getBlockState(gatewayPos).is(Blocks.GATEWAY)) {
                                 return gatewayPos;

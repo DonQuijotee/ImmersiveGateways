@@ -64,11 +64,10 @@ public class GatewayBlock extends BaseEntityBlock {
     @Override
     public void entityInside(BlockState state, Level level, BlockPos pos, Entity entity) {
         if (level instanceof ServerLevel serverLevel && canEntityTeleport(entity)) {
-            if (entity.getRootVehicle().isOnPortalCooldown()) {
-                entity.getRootVehicle().setPortalCooldown();
-            } else {
+            if (!entity.getRootVehicle().isOnPortalCooldown()) {
                 GatewayBlockEntity.teleportEntity(serverLevel, pos, entity);
             }
+            entity.getRootVehicle().setPortalCooldown(40);
         }
     }
 

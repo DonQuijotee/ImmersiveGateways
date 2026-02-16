@@ -169,7 +169,7 @@ public class GatewayBlockEntity extends BlockEntity {
         if (blockEntity.color == 0) {
             blockEntity.color = 1;
 
-            // Fetch color and generate portal if it does not exist
+            // Fetch color and generate a portal if it does not exist
             GatewayExecutorController.submit(() -> {
                 PortalDataManager.PortalPair pair = PortalDataManager.search(level, pos, true);
                 applyPortalColor(level, pos, blockEntity, pair);
@@ -190,12 +190,10 @@ public class GatewayBlockEntity extends BlockEntity {
     private static void playSound(Level level, BlockPos pos, SoundEvent sound) {
         float volume = level.random.nextFloat() * 0.1f + 0.1f;
         float pitch = level.random.nextFloat() * 0.4f + 0.8f;
-        level.playSound(null, pos, sound, SoundSource.BLOCKS, volume, pitch);
+        level.playLocalSound(pos.getX(), pos.getY(), pos.getZ(), sound, SoundSource.BLOCKS, volume, pitch, false);
     }
 
     public static void teleportEntity(ServerLevel level, BlockPos pos, Entity entity) {
-        entity.setPortalCooldown();
-
         // Find exist
         PortalDataManager.PortalPair pair = PortalDataManager.search(level, pos, false);
         if (pair == null) {
@@ -207,10 +205,6 @@ public class GatewayBlockEntity extends BlockEntity {
         if (entity instanceof LivingEntity livingEntity) {
             livingEntity.addEffect(new MobEffectInstance(MobEffects.BLINDNESS, 50, 0));
         }
-
-        // Sound
-        playSound(level, pair.first().boundingBox().getCenter(), Sounds.GATEWAY);
-        playSound(level, pair.second().boundingBox().getCenter(), Sounds.GATEWAY);
 
         // Find a safe position to teleport
         PortalDataManager.Portal portal = pair.getTarget(pos);
@@ -232,6 +226,10 @@ public class GatewayBlockEntity extends BlockEntity {
             entity.teleportToWithTicket(targetX, targetY, targetZ);
             entity.setYRot(targetYRot);
         }
+
+        // Sound
+        level.playSound(null, pair.first().boundingBox().getCenter(), Sounds.GATEWAY, SoundSource.BLOCKS, 1.0f, 1.0f);
+        level.playSound(null, pair.second().boundingBox().getCenter(), Sounds.GATEWAY, SoundSource.BLOCKS, 1.0f, 1.0f);
     }
 
     @Override
