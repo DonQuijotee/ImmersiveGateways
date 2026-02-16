@@ -211,9 +211,9 @@ public class GatewayBlockEntity extends BlockEntity {
         BlockPos targetPos = portal.getSafePosition(level);
         double portalCenterX = (portal.boundingBox().maxX() + portal.boundingBox().minX()) / 2.0;
         double portalCenterZ = (portal.boundingBox().maxZ() + portal.boundingBox().minZ()) / 2.0;
-        double deltaX = portalCenterX - (targetPos.getX() + 0.5);
-        double deltaZ = portalCenterZ - (targetPos.getZ() + 0.5);
-        float targetYRot = (float) (Math.toDegrees(Math.atan2(-deltaZ, deltaX)) + 360) % 360;
+        double deltaX = portalCenterX - targetPos.getX();
+        double deltaZ = portalCenterZ - targetPos.getZ();
+        float targetYRot = (float) (Math.toDegrees(Math.atan2(deltaZ, deltaX)) + 450) % 360;
         targetYRot = Math.round(targetYRot / 90) * 90;
         double targetX = targetPos.getX() + 0.5;
         double targetY = targetPos.getY();

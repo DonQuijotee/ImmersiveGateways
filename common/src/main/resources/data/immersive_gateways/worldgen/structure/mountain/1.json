@@ -23,7 +23,7 @@
   },
   "start_height": {
     "type": "constant",
-    "absolute": -9
+    "absolute": -8
   },
   "use_expansion_hack": false
 }
