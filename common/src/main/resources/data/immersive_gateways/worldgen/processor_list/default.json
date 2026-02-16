@@ -15,29 +15,5 @@
         }
       }
     ]
-  },
-  {
-    "processor_type": "minecraft:rule",
-    "rules": [
-      {
-        "location_predicate": {
-          "predicate_type": "always_true"
-        },
-        "input_predicate": {
-          "predicate_type": "block_match",
-          "block": "minecraft:air"
-        },
-        "position_predicate": {
-          "predicate_type": "minecraft:linear_pos",
-          "min_chance": 1.0,
-          "max_chance": 0.0,
-          "min_dist": 8,
-          "max_dist": 12
-        },
-        "output_state": {
-          "Name": "minecraft:cave_air"
-        }
-      }
-    ]
   }
 ]

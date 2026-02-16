@@ -39,21 +39,32 @@ def _flood_fill(structure: Compound):
         if int(block["state"]) == air_index:
             block["state"] = Int(cave_air_index)
 
+    max_x = 0
+    max_z = 0
     columns: dict[tuple[int, int], list[tuple[int, Compound]]] = {}
     for block in blocks:
         x, y, z = (int(coord) for coord in block["pos"])
         columns.setdefault((x, z), []).append((y, block))
+        max_x = max(max_x, x)
+        max_z = max(max_z, z)
 
     for entries in columns.values():
         entries.sort(key=lambda item: item[0])
-        reached_solid = False
         for _, block in entries:
             state = int(block["state"])
             if state != cave_air_index:
-                reached_solid = True
-                continue
-            if not reached_solid:
-                block["state"] = Int(air_index)
+                break
+            block["state"] = Int(air_index)
+
+        x = int(entries[0][1]["pos"][0])
+        z = int(entries[0][1]["pos"][2])
+        distance_to_center = max(abs(x - max_x / 2), abs(z - max_z / 2))
+        distance = int(len(entries) * distance_to_center / max(max_x, max_z) * 0.25)
+        for _, block in entries[:-distance:-1]:
+            state = int(block["state"])
+            if state != cave_air_index:
+                break
+            block["state"] = Int(air_index)
 
 
 def _set_loot_table(nbt: Compound, loot_table: str) -> None:
