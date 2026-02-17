@@ -87,7 +87,7 @@ public class PortalDataManager {
             // Add portal and initialize search
             portal = new PortalPair(
                     new Portal(estimateBoundingBox(level, pos), getColor(level, pos)),
-                    new Portal(estimateBoundingBox(level, target), getColor(level, pos))
+                    new Portal(estimateBoundingBox(level, target), getColor(level, target))
             );
             state.add(portal);
 
