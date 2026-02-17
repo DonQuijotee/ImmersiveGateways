@@ -17,6 +17,7 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.TicketType;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.biome.Biome;
@@ -355,6 +356,9 @@ public class PortalDataManager {
                 candidates.add(new BlockPos(x, boundingBox.minY(), boundingBox.maxZ() + 1));
             }
 
+            BlockPos center = boundingBox.getCenter();
+            level.getChunkSource().addRegionTicket(TicketType.PORTAL, new ChunkPos(center), 3, center);
+
             for (int y = boundingBox.minY(); y <= level.getMaxBuildHeight(); y++) {
                 for (BlockPos candidate : candidates) {
                     BlockPos pos = new BlockPos(candidate.getX(), y, candidate.getZ());
@@ -364,7 +368,7 @@ public class PortalDataManager {
                 }
             }
 
-            return boundingBox.getCenter();
+            return center;
         }
     }
 

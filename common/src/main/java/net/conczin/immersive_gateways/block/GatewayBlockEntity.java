@@ -14,10 +14,13 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.util.Mth;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.entity.RelativeMovement;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -27,9 +30,7 @@ import org.joml.Vector2f;
 import org.joml.Vector3d;
 import org.joml.Vector3f;
 
-import java.util.Map;
-import java.util.Random;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class GatewayBlockEntity extends BlockEntity {
@@ -214,22 +215,52 @@ public class GatewayBlockEntity extends BlockEntity {
         double deltaX = portalCenterX - targetPos.getX();
         double deltaZ = portalCenterZ - targetPos.getZ();
         float targetYRot = (float) (Math.toDegrees(Math.atan2(deltaZ, deltaX)) + 450) % 360;
-        targetYRot = Math.round(targetYRot / 90) * 90;
+        float finalTargetYRot = Math.round(targetYRot / 90) * 90;
         double targetX = targetPos.getX() + 0.5;
         double targetY = targetPos.getY();
         double targetZ = targetPos.getZ() + 0.5;
-        if (entity instanceof ServerPlayer serverPlayer) {
-            serverPlayer.teleportTo(level, targetX, targetY, targetZ, targetYRot, serverPlayer.getXRot());
-            serverPlayer.setYHeadRot(targetYRot);
-            serverPlayer.yHeadRotO = targetYRot;
-        } else {
-            entity.teleportToWithTicket(targetX, targetY, targetZ);
-            entity.setYRot(targetYRot);
-        }
 
-        // Sound
-        level.playSound(null, pair.first().boundingBox().getCenter(), Sounds.GATEWAY, SoundSource.BLOCKS, 1.0f, 1.0f);
-        level.playSound(null, pair.second().boundingBox().getCenter(), Sounds.GATEWAY, SoundSource.BLOCKS, 1.0f, 1.0f);
+        // Teleport
+        level.getServer().execute(() -> {
+            teleportEntity(level, entity, targetX, targetY, targetZ, finalTargetYRot, entity.getXRot());
+
+            // Sound
+            level.playSound(null, pair.first().boundingBox().getCenter(), Sounds.GATEWAY, SoundSource.BLOCKS, 1.0f, 1.0f);
+            level.playSound(null, pair.second().boundingBox().getCenter(), Sounds.GATEWAY, SoundSource.BLOCKS, 1.0f, 1.0f);
+        });
+    }
+
+    public static void teleportEntity(ServerLevel level, Entity entity, double x, double y, double z, float yaw, float pitch) {
+        // Clamp to valid spawnable bounds
+        BlockPos pos = BlockPos.containing(x, y, z);
+        if (!Level.isInSpawnableBounds(pos)) return;
+
+        // Relative movement flags for absolute teleport
+        Set<RelativeMovement> flags = EnumSet.noneOf(RelativeMovement.class);
+        flags.add(RelativeMovement.X);
+        flags.add(RelativeMovement.Y);
+        flags.add(RelativeMovement.Z);
+        flags.add(RelativeMovement.X_ROT);
+        flags.add(RelativeMovement.Y_ROT);
+
+        // Teleport entity
+        if (entity.teleportTo(level, x, y, z, flags, Mth.wrapDegrees(yaw), Mth.wrapDegrees(pitch))) {
+            // Reset Y motion if not flying
+            if (!(entity instanceof LivingEntity living) || !living.isFallFlying()) {
+                entity.setDeltaMovement(entity.getDeltaMovement().multiply(1.0, 0.0, 1.0));
+                entity.setOnGround(true);
+            }
+
+            // Stop mob navigation if applicable
+            if (entity instanceof PathfinderMob mob) {
+                mob.getNavigation().stop();
+            }
+
+            // Reset velocity for players to prevent rubberbanding
+            if (entity instanceof ServerPlayer player) {
+                player.hurtMarked = true;
+            }
+        }
     }
 
     @Override
