@@ -67,7 +67,7 @@ public class GatewayBlock extends BaseEntityBlock {
             if (!entity.getRootVehicle().isOnPortalCooldown()) {
                 GatewayBlockEntity.teleportEntity(serverLevel, pos, entity);
             }
-            entity.getRootVehicle().setPortalCooldown(40);
+            entity.getRootVehicle().setPortalCooldown(20);
         }
     }
 

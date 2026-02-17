@@ -166,7 +166,7 @@ public class PortalDataManager {
         if (structureStart.isValid()) {
             BoundingBox boundingbox = structureStart.getBoundingBox();
             Utils.getChunksInBoundingBox(boundingbox).forEach((chunkPos) ->
-                    structureStart.placeInChunk(
+                    level.getServer().executeBlocking(() -> structureStart.placeInChunk(
                             level,
                             level.structureManager(),
                             chunkgenerator,
@@ -180,7 +180,7 @@ public class PortalDataManager {
                                     chunkPos.getMaxBlockZ()
                             ),
                             chunkPos
-                    )
+                    ))
             );
             return findBlockInArea(level, boundingbox);
         }
