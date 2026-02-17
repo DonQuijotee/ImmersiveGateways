@@ -60,7 +60,9 @@ def _flood_fill(structure: Compound):
         z = int(entries[0][1]["pos"][2])
         distance_to_center = max(abs(x - max_x / 2), abs(z - max_z / 2))
         distance = int(len(entries) * distance_to_center / max(max_x, max_z) * 0.25)
-        for _, block in entries[:-distance:-1]:
+        if distance <= 0:
+            continue
+        for _, block in entries[-distance:][::-1]:
             state = int(block["state"])
             if state != cave_air_index:
                 break
