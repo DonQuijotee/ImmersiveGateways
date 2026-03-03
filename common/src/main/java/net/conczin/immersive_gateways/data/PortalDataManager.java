@@ -41,6 +41,8 @@ public class PortalDataManager {
     private static final long SEARCH_ATTEMPTS = 10;
     private static final int TOO_CLOSE_CHUNKS = 2;
 
+    private static final Random random = new Random();
+
     public static long toLong(int x, int z) {
         return ((long) x << 32) | (z & 0xFFFFFFFFL);
     }
@@ -67,8 +69,8 @@ public class PortalDataManager {
             int attempt = 0;
             for (; attempt < SEARCH_ATTEMPTS; attempt++) {
                 Config c = Config.getInstance();
-                float distance = level.random.nextFloat() * (c.maxDistance - c.minDistance) + c.minDistance;
-                double angle = level.random.nextFloat() * Math.PI;
+                float distance = random.nextFloat() * (c.maxDistance - c.minDistance) + c.minDistance;
+                double angle = random.nextFloat() * Math.PI;
 
                 // Approximate Target position
                 target = new BlockPos(

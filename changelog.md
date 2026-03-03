@@ -1,3 +1,8 @@
+# 0.0.3
+
+* Fixed a crash on dedicated Forge
+* Fixed a crash with C2ME
+
 # 0.0.2
 
 * Portals now generate their target structure rather than searching for it, reducing initial loading time
