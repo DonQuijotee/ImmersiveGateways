@@ -2,6 +2,7 @@
 
 * Fixed a crash on dedicated Forge
 * Fixed a crash with C2ME
+* Increased retry count to have less ocean portals and other errors
 
 # 0.0.2
 

@@ -38,7 +38,8 @@ import java.util.*;
  */
 public class PortalDataManager {
     private static final long MAX_INHABITED_TIME = 20L * 60L;
-    private static final long SEARCH_ATTEMPTS = 10;
+    private static final long SEARCH_ATTEMPTS = 16;
+    private static final long SEARCH_FALLBACK_ATTEMPTS = 5;
     private static final int TOO_CLOSE_CHUNKS = 2;
 
     private static final Random random = new Random();
@@ -80,7 +81,7 @@ public class PortalDataManager {
                 );
 
                 // Real resolved position
-                BlockPos realTarget = placeStructure(level, target, attempt > SEARCH_ATTEMPTS / 2, attempt != SEARCH_ATTEMPTS - 1);
+                BlockPos realTarget = placeStructure(level, target, attempt >= SEARCH_ATTEMPTS - SEARCH_FALLBACK_ATTEMPTS, attempt != SEARCH_ATTEMPTS - 1);
                 if (realTarget != null) {
                     target = realTarget;
                     break;
@@ -135,7 +136,6 @@ public class PortalDataManager {
 
         // If not structure works for this biome, use default
         if (structures.isEmpty() && useFallback) {
-            // TODO: Try n times to find a proper biomes, and then fall back
             TagKey<Structure> structureTagKey = TagKey.create(Registries.STRUCTURE, Common.locate("plains"));
             structures = registry.getTag(structureTagKey)
                     .map(t -> t.stream().map(Holder::value).toList())
