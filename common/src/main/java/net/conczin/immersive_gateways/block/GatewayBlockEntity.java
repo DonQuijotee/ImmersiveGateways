@@ -3,7 +3,6 @@ package net.conczin.immersive_gateways.block;
 import net.conczin.immersive_gateways.BlockEntityTypes;
 import net.conczin.immersive_gateways.Sounds;
 import net.conczin.immersive_gateways.data.PortalDataManager;
-import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
@@ -172,8 +171,12 @@ public class GatewayBlockEntity extends BlockEntity {
 
             // Fetch color and generate a portal if it does not exist
             GatewayExecutorController.submit(() -> {
-                PortalDataManager.PortalPair pair = PortalDataManager.search(level, pos, true);
-                applyPortalColor(level, pos, blockEntity, pair);
+                try {
+                    PortalDataManager.PortalPair pair = PortalDataManager.search(level, pos, true);
+                    applyPortalColor(level, pos, blockEntity, pair);
+                } catch (Throwable t) {
+                    throw new RuntimeException("Exception in searcher thread", t);
+                }
             });
         }
     }
@@ -266,7 +269,8 @@ public class GatewayBlockEntity extends BlockEntity {
     @Override
     public void load(CompoundTag tag) {
         super.load(tag);
-        if (this.level instanceof ClientLevel) {
+
+        if (this.level != null && this.level.isClientSide()) {
             color = tag.getInt("Color");
         }
     }
