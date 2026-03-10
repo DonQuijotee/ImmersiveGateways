@@ -1,3 +1,7 @@
+# 0.0.4
+
+* Removed unsafe randoms
+
 # 0.0.3
 
 * Fixed a crash on dedicated Forge

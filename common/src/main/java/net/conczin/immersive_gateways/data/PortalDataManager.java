@@ -19,6 +19,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.TicketType;
 import net.minecraft.tags.TagKey;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.chunk.ChunkAccess;
@@ -42,7 +43,7 @@ public class PortalDataManager {
     private static final long SEARCH_FALLBACK_ATTEMPTS = 5;
     private static final int TOO_CLOSE_CHUNKS = 2;
 
-    private static final Random random = new Random();
+    private static final RandomSource random = RandomSource.createThreadSafe();
 
     public static long toLong(int x, int z) {
         return ((long) x << 32) | (z & 0xFFFFFFFFL);
@@ -150,7 +151,7 @@ public class PortalDataManager {
         }
 
         // Find the start position
-        Structure structure = structures.get(level.getRandom().nextInt(structures.size()));
+        Structure structure = structures.get(random.nextInt(structures.size()));
         ChunkGenerator chunkgenerator = level.getChunkSource().getGenerator();
         StructureStart structureStart = structure.generate(
                 level.registryAccess(),
@@ -173,7 +174,7 @@ public class PortalDataManager {
                             level,
                             level.structureManager(),
                             chunkgenerator,
-                            level.getRandom(),
+                            random,
                             new BoundingBox(
                                     chunkPos.getMinBlockX(),
                                     level.getMinBuildHeight(),
