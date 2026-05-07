@@ -1,6 +1,6 @@
 plugins {
     id 'multiloader-loader'
-    id 'net.neoforged.moddev.legacyforge'
+    id 'net.neoforged.moddev'
 }
 
 mixin {
@@ -9,8 +9,8 @@ mixin {
     config("${mod_id}.mixins.json")
 }
 
-legacyForge {
-    version = "${minecraft_version}-${forge_version}"
+neoForge {
+    version = "${neoforge_version}"
 
     validateAccessTransformers = true
 
@@ -18,10 +18,7 @@ legacyForge {
     if (at.exists()) {
         accessTransformers = ["src/main/resources/META-INF/accesstransformer.cfg"]
     }
-    parchment {
-        minecraftVersion = parchment_minecraft
-        mappingsVersion = parchment_version
-    }
+
     runs {
         client {
             client()
@@ -50,6 +47,5 @@ dependencies {
 }
 
 jar {
-    finalizedBy('reobfJar')
     manifest.attributes(["MixinConfigs": "${mod_id}.mixins.json"])
 }
